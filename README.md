@@ -43,7 +43,7 @@ version = "0.5.0"
 [[package]]
 path = "rust-lib"
 name = "myorg-rust-lib"
-type = "rust"
+type = "cargo"
 version = "2.1.0"
 ```
 
@@ -103,7 +103,7 @@ The configuration file uses TOML format with an array of package definitions:
 [[package]]
 path = "relative/path/to/package"  # Required: Path from repo root
 name = "package-name"               # Required: Package identifier
-type = "npm"                        # Required: "npm" | "go" | "rust"
+type = "npm"                        # Required: "npm" | "go" | "cargo"
 version = "1.0.0"                   # Required: Semantic version
 
 [[package]]
@@ -140,7 +140,7 @@ Package type. Determines which file to update and how to process it.
 **Valid values**:
 - `"npm"` - Updates `package.json`
 - `"go"` - Updates `go.mod`
-- `"rust"` - Updates `Cargo.toml`
+- `"cargo"` - Updates `Cargo.toml`
 
 #### `version` (required)
 Target semantic version to set for the package.
@@ -157,7 +157,7 @@ For Rust packages in a Cargo workspace, whether to update other workspace member
 [[package]]
 path = "crates/core"
 name = "myorg-core"
-type = "rust"
+type = "cargo"
 version = "2.0.0"
 update_workspace_deps = true  # Update other crates that depend on myorg-core
 ```
@@ -286,13 +286,13 @@ version = "1.0.0"
 [[package]]
 path = "crates/core"
 name = "myorg-core"
-type = "rust"
+type = "cargo"
 version = "3.2.1"
 
 [[package]]
 path = "crates/utils"
 name = "myorg-utils"
-type = "rust"
+type = "cargo"
 version = "2.0.0"
 ```
 
@@ -459,7 +459,7 @@ myorg-utils = { path = "../utils", version = "1.0.0" }
 [[package]]
 path = "crates/core"
 name = "myorg-core"
-type = "rust"
+type = "cargo"
 version = "2.0.0"
 update_workspace_deps = true  # Will update myorg-app's dependency on core
 
@@ -467,7 +467,7 @@ update_workspace_deps = true  # Will update myorg-app's dependency on core
 [[package]]
 path = "crates/utils"
 name = "myorg-utils"
-type = "rust"
+type = "cargo"
 version = "1.5.0"
 update_workspace_deps = true
 
@@ -475,7 +475,7 @@ update_workspace_deps = true
 [[package]]
 path = "crates/app"
 name = "myorg-app"
-type = "rust"
+type = "cargo"
 version = "2.1.0"
 ```
 
