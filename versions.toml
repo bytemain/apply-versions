@@ -1,0 +1,9 @@
+# versions.toml - Version management configuration for apply-versions
+# This project uses itself to manage versions (dogfooding!)
+
+# Main npm package
+[[package]]
+type = "npm"
+path = "."
+name = "apply-versions"
+version = "1.1.0"
