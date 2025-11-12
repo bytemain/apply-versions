@@ -11,6 +11,9 @@
   },
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "apply-versions": "./dist/cli.js"
+  },
   "files": [
     "dist"
   ],
@@ -28,5 +31,11 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.6"
   },
-  "private": true
+  "private": true,
+  "dependencies": {
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.2",
+    "simple-git": "^3.30.0",
+    "smol-toml": "^1.4.2"
+  }
 }

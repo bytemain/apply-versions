@@ -11,5 +11,15 @@ export default defineConfig({
       format: 'cjs',
       syntax: ['node 18'],
     },
+    // CLI build
+    {
+      source: {
+        entry: {
+          cli: './src/cli.ts',
+        },
+      },
+      format: 'esm',
+      syntax: ['node 18'],
+    },
   ],
 });

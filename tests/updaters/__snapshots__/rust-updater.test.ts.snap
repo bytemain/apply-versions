@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RustPackageUpdater > should fail when version regex does not match 1`] = `
+"Invalid TOML document: invalid value
+
+2:  name = "myorg-server"
+3:  version = 1.0.0  # No quotes
+              ^
+4:  edition = "2021"
+"
+`;
+
+exports[`RustPackageUpdater > should handle file read errors 1`] = `"ENOENT: no such file or directory, open 'nonexistent/Cargo.toml'"`;
+
+exports[`RustPackageUpdater > should handle invalid TOML 1`] = `
+"Invalid TOML document: incomplete key-value: cannot find end of key
+
+1:  invalid toml [[[
+    ^
+"
+`;
+
+exports[`RustPackageUpdater > should update version in Cargo.toml 1`] = `
+"[package]
+name = "myorg-server"
+version = "2.0.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+"
+`;
