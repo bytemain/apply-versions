@@ -1,6 +1,7 @@
 // Go package updater
 
 import { join } from 'node:path';
+import { simpleGit } from 'simple-git';
 import type { PackageUpdater } from './base-updater.js';
 import type { UpdateResult, PackageConfig } from '../types/index.js';
 import { LocalFileRepository } from '../repositories/index.js';
@@ -22,21 +23,61 @@ export class GoPackageUpdater implements PackageUpdater {
 		const filePath = this.getPackageFilePath(packagePath);
 		const content = await this.fileRepo.read(filePath);
 
-		// Parse go.mod to extract version from module path
-		// Format: module github.com/user/repo/v2
-		const moduleMatch = content.match(/^module\s+(.+?)(?:\/v(\d+))?$/m);
+		// Parse go.mod to extract module path
+		const moduleMatch = content.match(/^module\s+(.+)$/m);
 		if (!moduleMatch) {
 			throw new Error(`No module directive found in ${filePath}`);
 		}
 
-		const versionPart = moduleMatch[2];
-		if (versionPart) {
-			return `${versionPart}.0.0`; // Major version only in go.mod
-		}
+		// For Go modules, the version comes from Git tags, not go.mod
+		// We need to find the latest tag that matches this package path
+		try {
+			const git = simpleGit(process.cwd());
+			const tags = await git.tags();
+			
+			// Generate the tag prefix for this package
+			const tagPrefix = this.getTagPrefix(packagePath);
+			
+			// Find all tags that match this package
+			const packageTags = tags.all
+				.filter(tag => tag.startsWith(tagPrefix))
+				.map(tag => {
+					// Extract version from tag (e.g., "v1.2.3" or "path/v1.2.3")
+					const versionMatch = tag.match(/v(\d+\.\d+\.\d+.*)$/);
+					return versionMatch ? versionMatch[1] : null;
+				})
+				.filter(version => version !== null)
+				.sort((a, b) => {
+					// Simple version comparison
+					const aParts = a!.split('.').map(n => parseInt(n, 10));
+					const bParts = b!.split('.').map(n => parseInt(n, 10));
+					
+					for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+						const aVal = aParts[i] || 0;
+						const bVal = bParts[i] || 0;
+						if (aVal !== bVal) {
+							return bVal - aVal; // Descending order
+						}
+					}
+					return 0;
+				});
 
-		// For v0 and v1, we need to check git tags or return a default
-		// For now, we'll return "0.0.0" as we can't determine from go.mod alone
-		return '0.0.0';
+			// Return the latest version, or "0.0.0" if no tags found
+			return packageTags.length > 0 ? packageTags[0]! : '0.0.0';
+		} catch (error) {
+			// If git operations fail, return default
+			console.warn(`Failed to read git tags for ${packagePath}: ${error}`);
+			return '0.0.0';
+		}
+	}
+
+	private getTagPrefix(packagePath: string): string {
+		// For root-level packages, tag prefix is just "v"
+		// For subpath packages, tag prefix is "path/v"
+		if (packagePath === '.' || packagePath === '') {
+			return 'v';
+		}
+		return `${packagePath}/v`;
 	}
 
 	async updateVersion(
