@@ -1,6 +1,7 @@
 // npm package updater
 
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 import type { PackageUpdater } from './base-updater.js';
 import type { UpdateResult, PackageConfig } from '../types/index.js';
 import { LocalFileRepository } from '../repositories/index.js';
@@ -30,6 +31,27 @@ export class NpmPackageUpdater implements PackageUpdater {
 		return pkg.version;
 	}
 
+	private async runNpmInstall(packagePath: string): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const npmProcess = spawn('npm', ['install'], {
+				cwd: packagePath,
+				stdio: 'inherit'
+			});
+
+			npmProcess.on('close', (code) => {
+				if (code === 0) {
+					resolve();
+				} else {
+					reject(new Error(`npm install failed with exit code ${code}`));
+				}
+			});
+
+			npmProcess.on('error', (error) => {
+				reject(new Error(`Failed to run npm install: ${error.message}`));
+			});
+		});
+	}
+
 	async updateVersion(
 		packagePath: string,
 		newVersion: string,
@@ -45,6 +67,10 @@ export class NpmPackageUpdater implements PackageUpdater {
 				pkg.version = newVersion;
 				const updatedContent = JSON.stringify(pkg, null, 2) + '\n';
 				await this.fileRepo.write(filePath, updatedContent);
+				
+				// Run npm install after updating package.json
+				console.log(`Running npm install in ${packagePath}...`);
+				await this.runNpmInstall(packagePath);
 			}
 
 			return {
