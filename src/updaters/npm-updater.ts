@@ -73,10 +73,14 @@ export class NpmPackageUpdater implements PackageUpdater {
 				await this.runNpmInstall(packagePath);
 			}
 
+			// Include package-lock.json in the commit
+			const lockFilePath = join(packagePath, 'package-lock.json');
+			
 			return {
 				success: true,
 				oldVersion,
 				newVersion,
+				additionalFiles: [lockFilePath],
 			};
 		} catch (error) {
 			return {

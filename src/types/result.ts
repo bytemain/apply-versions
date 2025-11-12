@@ -12,6 +12,7 @@ export interface UpdateSuccess {
 	oldVersion: string;
 	newVersion: string;
 	updatedWorkspaceDeps?: string[];
+	additionalFiles?: string[]; // Additional files to stage in git (e.g., package-lock.json)
 }
 
 export interface UpdateFailure {

@@ -30,6 +30,7 @@ export class GitOperations {
 		oldVersion: string,
 		newVersion: string,
 		dryRun: boolean,
+		additionalFiles?: string[],
 	): Promise<GitOperationResult> {
 		if (dryRun) {
 			return {
@@ -39,8 +40,21 @@ export class GitOperations {
 		}
 
 		try {
-			// Stage the file
+			// Stage the main file
 			await this.git.add(filePath);
+			
+			// Stage additional files if provided
+			if (additionalFiles && additionalFiles.length > 0) {
+				for (const file of additionalFiles) {
+					try {
+						await this.git.add(file);
+					} catch (error) {
+						// If the file doesn't exist, skip it silently
+						// This is expected for files like package-lock.json that might not exist
+						console.log(`  ℹ Skipping ${file} (file not found)`);
+					}
+				}
+			}
 
 			// Create commit message
 			const message = this.createCommitMessage(pkg, oldVersion, newVersion);

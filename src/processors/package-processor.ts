@@ -165,6 +165,7 @@ export class PackageProcessor {
 				updateResult.oldVersion,
 				updateResult.newVersion,
 				this.dryRun,
+				updateResult.additionalFiles,
 			);
 
 			if (!gitResult.success) {
