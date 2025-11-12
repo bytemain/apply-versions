@@ -1,124 +1,124 @@
 // Git operations
 
-import { simpleGit, type SimpleGit } from 'simple-git';
-import type { PackageConfig, GitOperationResult } from '../types/index.js';
+import { type SimpleGit, simpleGit } from 'simple-git';
+import type { GitOperationResult, PackageConfig } from '../types/index.js';
 
 export class GitOperations {
-	private git: SimpleGit;
+  private git: SimpleGit;
 
-	constructor(repoPath: string = process.cwd()) {
-		this.git = simpleGit(repoPath);
-	}
+  constructor(repoPath: string = process.cwd()) {
+    this.git = simpleGit(repoPath);
+  }
 
-	async isRepository(): Promise<boolean> {
-		try {
-			await this.git.status();
-			return true;
-		} catch {
-			return false;
-		}
-	}
+  async isRepository(): Promise<boolean> {
+    try {
+      await this.git.status();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
-	async hasUncommittedChanges(): Promise<boolean> {
-		const status = await this.git.status();
-		return !status.isClean();
-	}
+  async hasUncommittedChanges(): Promise<boolean> {
+    const status = await this.git.status();
+    return !status.isClean();
+  }
 
-	async stageAndCommit(
-		pkg: PackageConfig,
-		filePath: string,
-		oldVersion: string,
-		newVersion: string,
-		dryRun: boolean,
-		additionalFiles?: string[],
-	): Promise<GitOperationResult> {
-		if (dryRun) {
-			return {
-				success: true,
-				commitHash: 'dry-run',
-			};
-		}
+  async stageAndCommit(
+    pkg: PackageConfig,
+    filePath: string,
+    oldVersion: string,
+    newVersion: string,
+    dryRun: boolean,
+    additionalFiles?: string[],
+  ): Promise<GitOperationResult> {
+    if (dryRun) {
+      return {
+        success: true,
+        commitHash: 'dry-run',
+      };
+    }
 
-		try {
-			// Stage the main file
-			await this.git.add(filePath);
-			
-			// Stage additional files if provided
-			if (additionalFiles && additionalFiles.length > 0) {
-				for (const file of additionalFiles) {
-					try {
-						await this.git.add(file);
-					} catch (error) {
-						// If the file doesn't exist, skip it silently
-						// This is expected for files like package-lock.json that might not exist
-						console.log(`  ℹ Skipping ${file} (file not found)`);
-					}
-				}
-			}
+    try {
+      // Stage the main file
+      await this.git.add(filePath);
 
-			// Create commit message
-			const message = this.createCommitMessage(pkg, oldVersion, newVersion);
+      // Stage additional files if provided
+      if (additionalFiles && additionalFiles.length > 0) {
+        for (const file of additionalFiles) {
+          try {
+            await this.git.add(file);
+          } catch (error) {
+            // If the file doesn't exist, skip it silently
+            // This is expected for files like package-lock.json that might not exist
+            console.log(`  ℹ Skipping ${file} (file not found)`);
+          }
+        }
+      }
 
-			// Commit
-			const result = await this.git.commit(message);
+      // Create commit message
+      const message = this.createCommitMessage(pkg, oldVersion, newVersion);
 
-			return {
-				success: true,
-				commitHash: result.commit,
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
-		}
-	}
+      // Commit
+      const result = await this.git.commit(message);
 
-	async createTag(
-		tagName: string,
-		dryRun: boolean,
-	): Promise<GitOperationResult> {
-		if (dryRun) {
-			return {
-				success: true,
-				tagName,
-			};
-		}
+      return {
+        success: true,
+        commitHash: result.commit,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
 
-		try {
-			// Check if tag already exists
-			const tags = await this.git.tags();
-			if (tags.all.includes(tagName)) {
-				return {
-					success: false,
-					error: `Tag ${tagName} already exists`,
-				};
-			}
+  async createTag(
+    tagName: string,
+    dryRun: boolean,
+  ): Promise<GitOperationResult> {
+    if (dryRun) {
+      return {
+        success: true,
+        tagName,
+      };
+    }
 
-			// Create tag
-			await this.git.addTag(tagName);
+    try {
+      // Check if tag already exists
+      const tags = await this.git.tags();
+      if (tags.all.includes(tagName)) {
+        return {
+          success: false,
+          error: `Tag ${tagName} already exists`,
+        };
+      }
 
-			return {
-				success: true,
-				tagName,
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
-		}
-	}
+      // Create tag
+      await this.git.addTag(tagName);
 
-	private createCommitMessage(
-		pkg: PackageConfig,
-		oldVersion: string,
-		newVersion: string,
-	): string {
-		return `chore(${pkg.name}): bump version to ${newVersion}
+      return {
+        success: true,
+        tagName,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private createCommitMessage(
+    pkg: PackageConfig,
+    oldVersion: string,
+    newVersion: string,
+  ): string {
+    return `chore(${pkg.name}): bump version to ${newVersion}
 
 - Updated ${pkg.type} package at ${pkg.path}
 - Previous version: ${oldVersion}
 - New version: ${newVersion}`;
-	}
+  }
 }

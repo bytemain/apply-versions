@@ -3,12 +3,12 @@
 import type { PackageConfig } from './package.js';
 
 export interface Config {
-	package: PackageConfig[];
+  package: PackageConfig[];
 }
 
 export interface CLIOptions {
-	config: string;
-	dryRun: boolean;
-	yes: boolean;
-	verbose: boolean;
+  config: string;
+  dryRun: boolean;
+  yes: boolean;
+  verbose: boolean;
 }
