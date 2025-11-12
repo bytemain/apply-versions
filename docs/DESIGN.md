@@ -36,7 +36,7 @@
          │               │
 ┌────────▼──────┐  ┌────▼────────────────┐
 │  File Updater │  │   Git Operations    │
-│  (npm/go/rust)│  │ (commit, tag)       │
+│  (npm/go/cargo)│  │ (commit, tag)       │
 └───────────────┘  └─────────────────────┘
 ```
 
@@ -48,7 +48,7 @@
 - **Responsibilities**:
   - Parse TOML format
   - Validate required fields (path, name, type, version)
-  - Validate package types against known types (npm, go, rust)
+  - Validate package types against known types (npm, go, cargo)
   - Throw descriptive error for unknown package types
   - Validate semantic version format
   - Validate optional fields (e.g., update_workspace_deps for Rust)
@@ -127,12 +127,12 @@ The following packages will be updated:
 │ @myorg/web                         │ npm      │ 0.0.5    │ 0.0.6      │ No   │
 │ github.com/org/repo/packages/api   │ go       │ 0.0.4    │ 0.0.5      │ Yes  │
 │ github.com/org/repo/services/auth  │ go       │ 0.2.0    │ 0.2.1      │ Yes  │
-│ myorg-server                       │ rust     │ 0.24.10  │ 0.24.11    │ No   │
+│ myorg-server                       │ cargo    │ 0.24.10  │ 0.24.11    │ No   │
 └────────────────────────────────────┴──────────┴──────────┴────────────┴──────┘
 
 The following packages are already at target version and will be skipped:
 
-  • myorg-core (rust) - already at 0.2.0
+  • myorg-core (cargo) - already at 0.2.0
 
 Summary:
   • 4 packages will be updated
@@ -151,7 +151,7 @@ Summary:
 [[package]]
 path = "packages/api"                            # Relative path from repo root
 name = "github.com/org/repo/packages/api"        # Package name/module name
-type = "go"                                       # Package type: "npm" | "go" | "rust"
+type = "go"                                       # Package type: "npm" | "go" | "cargo"
 version = "0.0.5"                                 # Target version
 
 [[package]]
@@ -163,7 +163,7 @@ version = "0.0.6"
 [[package]]
 path = "crates/server"
 name = "myorg-server"
-type = "rust"
+type = "cargo"
 version = "0.24.11"
 update_workspace_deps = true                      # Optional: update workspace dependencies
 ```
@@ -172,7 +172,7 @@ update_workspace_deps = true                      # Optional: update workspace d
 
 - **path** (required): Relative path from repository root to package directory
 - **name** (required): Package identifier (used for commit messages and verification)
-- **type** (required): Package type (`npm`, `go`, or `rust`)
+- **type** (required): Package type (`npm`, `go`, or `cargo`)
 - **version** (required): Semantic version string (e.g., `1.2.3`)
 - **update_workspace_deps** (optional, Rust only): If `true`, update other workspace members that depend on this crate (default: `false`)
 
@@ -321,7 +321,7 @@ Before making any changes:
 **Unknown package type**:
 ```
 ❌ Error: Invalid package type 'python' for package at path 'services/api'
-  Valid types are: npm, go, rust
+  Valid types are: npm, go, cargo
 ```
 
 **Invalid version format**:
@@ -362,7 +362,7 @@ The following packages will be updated:
 
 The following packages are already at target version:
 
-  • myorg-server (rust) - 0.24.11
+  • myorg-server (cargo) - 0.24.11
 
 Summary:
   • 2 packages will be updated
@@ -385,7 +385,7 @@ Summary:
   ✓ Committed changes
   ✓ Created tag: packages/api/v0.0.5
 
-⊘ Skipping crates/server (rust)
+⊘ Skipping crates/server (cargo)
   Already at target version: 0.24.11
 
 ✅ Summary:
@@ -452,7 +452,7 @@ class PackageUpdaterFactory {
   private static updaters = new Map<PackageType, PackageUpdater>([
     ['npm', new NpmPackageUpdater()],
     ['go', new GoPackageUpdater()],
-    ['rust', new RustPackageUpdater()],
+    ['cargo', new RustPackageUpdater()],
   ]);
 
   static getUpdater(type: PackageType): PackageUpdater {
@@ -813,13 +813,13 @@ Use TypeScript strictly:
 
 ```typescript
 // Literal types for package types
-type PackageType = 'npm' | 'go' | 'rust';
+type PackageType = 'npm' | 'go' | 'cargo';
 
 // Discriminated unions for package configs
 type PackageConfig = 
   | { type: 'npm'; path: string; name: string; version: string }
   | { type: 'go'; path: string; name: string; version: string }
-  | { type: 'rust'; path: string; name: string; version: string; update_workspace_deps?: boolean };
+  | { type: 'cargo'; path: string; name: string; version: string; update_workspace_deps?: boolean };
 
 // Result types
 type UpdateResult = 
@@ -827,8 +827,8 @@ type UpdateResult =
   | { success: false; error: string };
 
 // Type guards
-function isRustPackage(config: PackageConfig): config is Extract<PackageConfig, { type: 'rust' }> {
-  return config.type === 'rust';
+function isCargoPackage(config: PackageConfig): config is Extract<PackageConfig, { type: 'cargo' }> {
+  return config.type === 'cargo';
 }
 ```
 
