@@ -10,6 +10,8 @@ A CLI tool for managing versions across multi-language monorepo projects. Automa
 - 🏷️ **Smart Git Tags**: Automatic tag creation for Go modules with subpath support
 - 🔍 **Dry Run Mode**: Preview changes before applying them
 - ✨ **Zero Config**: Works out of the box with sensible defaults
+- 📦 **Bump Command**: Quick version bumping from any subdirectory
+- 🔍 **Auto-Discovery**: Finds `versions.toml` by searching upward from current directory
 
 ## Installation
 
@@ -50,7 +52,12 @@ version = "2.1.0"
 2. Run the tool:
 
 ```bash
+# Apply all versions
 npx apply-versions
+
+# Or bump a package version from its directory
+cd packages/core
+npx apply-versions bump patch  # 1.2.3 -> 1.2.4
 ```
 
 3. Review the changes and confirm when prompted
@@ -59,7 +66,7 @@ npx apply-versions
 
 ## Usage
 
-### Basic Usage
+### Apply Command (Update all packages to specified versions)
 
 ```bash
 # Apply versions from default config (./versions.toml)
@@ -75,23 +82,71 @@ npx apply-versions --yes
 # Use a custom configuration file
 npx apply-versions --config ./my-versions.toml
 
+# Run from a subdirectory (auto-filters packages)
+cd packages
+npx apply-versions  # Only updates packages under packages/
+
+# Specify a path to filter packages
+npx apply-versions --path packages/core
+
 # Verbose output for debugging
 npx apply-versions --verbose
-
-# Combine options: auto-confirm with verbose output
-npx apply-versions --yes --verbose
 ```
+
+### Bump Command (Quick version bumping)
+
+```bash
+# Navigate to a package directory
+cd packages/core
+
+# Bump patch version (1.2.3 -> 1.2.4)
+npx apply-versions bump patch
+
+# Bump minor version (1.2.3 -> 1.3.0)
+npx apply-versions bump minor
+
+# Bump major version (1.2.3 -> 2.0.0)
+npx apply-versions bump major
+
+# Skip confirmation
+npx apply-versions bump patch --yes
+
+# Works from subdirectories too
+cd packages/core/src
+npx apply-versions bump patch  # Automatically finds and bumps core package
+```
+
+The `bump` command:
+1. Finds `versions.toml` by searching upward
+2. Identifies the package(s) in current directory
+3. Calculates new version based on bump type
+4. Updates `versions.toml`
+5. Applies the changes (updates files, creates commit)
+
+See [BUMP.md](docs/BUMP.md) for detailed usage examples.
 
 ### Command Line Options
 
+**Apply Command:**
+
 | Option | Alias | Description | Default |
 |--------|-------|-------------|---------|
-| `--config <path>` | `-c` | Path to versions.toml configuration file | `./versions.toml` |
+| `--config <path>` | `-c` | Path to versions.toml configuration file | Auto-search upward |
+| `--path <path>` | `-p` | Only process packages under this path | All packages |
 | `--dry-run` | `-d` | Preview changes without applying them | `false` |
 | `--yes` | `-y` | Skip confirmation prompt and proceed automatically | `false` |
 | `--verbose` | `-v` | Show detailed output and debug information | `false` |
-| `--help` | `-h` | Display help message | - |
-| `--version` | - | Show tool version | - |
+
+**Bump Command:**
+
+```bash
+apply-versions bump <patch|minor|major> [options]
+```
+
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| `--yes` | `-y` | Skip confirmation prompt | `false` |
+| `--verbose` | `-v` | Show detailed output | `false` |
 
 ## Configuration
 
