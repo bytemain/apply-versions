@@ -7,6 +7,7 @@ import { ConsoleProgressObserver } from './observers/index.js';
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { resolve, dirname, relative, join } from 'node:path';
 import * as readline from 'node:readline';
+import { simpleGit } from 'simple-git';
 
 interface CLIOptions {
   config: string;
@@ -303,6 +304,14 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
       await updateTomlVersion(configPath, plan.package.path, plan.newVersion);
     }
     console.log('✅ Updated versions.toml');
+
+    // Commit versions.toml changes
+    console.log('\n📝 Committing versions.toml...');
+    const git = simpleGit(configDir);
+    await git.add(configPath);
+    const commitMessage = `chore: bump version${bumpPlan.length > 1 ? 's' : ''}\n\n${bumpPlan.map(p => `- ${p.package.name}: ${p.oldVersion} → ${p.newVersion}`).join('\n')}`;
+    await git.commit(commitMessage);
+    console.log('✅ Committed versions.toml');
 
     // Apply version changes
     console.log('\n🚀 Applying version changes...');
