@@ -125,9 +125,21 @@ tokio = { version = "1.0", features = ["full"] }
     expect(content).toBe(mockFiles.cargoToml);
   });
 
-  it('should not create tags by default', () => {
+  it('should create tags by default', () => {
     const shouldCreateTag = updater.shouldCreateTag(mockPackages.rust);
+    expect(shouldCreateTag).toBe(true);
+  });
+
+  it('should respect create_tag config when set to false', () => {
+    const pkg = { ...mockPackages.rust, create_tag: false };
+    const shouldCreateTag = updater.shouldCreateTag(pkg);
     expect(shouldCreateTag).toBe(false);
+  });
+
+  it('should respect create_tag config when set to true', () => {
+    const pkg = { ...mockPackages.rust, create_tag: true };
+    const shouldCreateTag = updater.shouldCreateTag(pkg);
+    expect(shouldCreateTag).toBe(true);
   });
 
   it('should generate simple tag name', () => {

@@ -217,6 +217,30 @@ version = "2.0.0"
 update_workspace_deps = true  # Update other crates that depend on myorg-core
 ```
 
+#### `create_tag` (optional, npm and Rust only)
+Whether to create a Git tag when applying version changes. By default, tags are created for all package types.
+
+**Valid values**: `true` or `false` (default: `true`)
+
+**Example**:
+```toml
+# npm package without tag creation
+[[package]]
+path = "packages/internal-tool"
+name = "@myorg/internal-tool"
+type = "npm"
+version = "0.1.0"
+create_tag = false  # Skip Git tag creation for internal packages
+
+# Rust package with tag creation (default behavior)
+[[package]]
+path = "crates/api"
+name = "myorg-api"
+type = "cargo"
+version = "1.0.0"
+create_tag = true  # Explicitly enable Git tag creation
+```
+
 ## How It Works
 
 ### Update Process
@@ -248,7 +272,16 @@ For each package in `versions.toml`:
 ### Git Tag Strategy
 
 #### npm and Rust Packages
-No automatic Git tags are created. Only file updates and commits are performed.
+By default, Git tags are created with format `v{version}` (e.g., `v1.2.3`). You can disable tag creation by setting `create_tag = false` in the package configuration.
+
+```toml
+[[package]]
+type = "npm"
+path = "packages/core"
+name = "@myorg/core"
+version = "1.2.3"
+create_tag = false  # No Git tag will be created
+```
 
 #### Go Packages
 

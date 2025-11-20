@@ -92,8 +92,12 @@ export class NpmPackageUpdater implements PackageUpdater {
   }
 
   shouldCreateTag(pkg: PackageConfig): boolean {
-    // npm packages typically don't create automatic Git tags
-    return false;
+    // Check if create_tag is explicitly set in config
+    if (pkg.type === 'npm' && pkg.create_tag !== undefined) {
+      return pkg.create_tag;
+    }
+    // Default to true for npm packages
+    return true;
   }
 
   getTagName(pkg: PackageConfig): string {

@@ -161,9 +161,21 @@ describe('NpmPackageUpdater', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it('should not create tags by default', () => {
+  it('should create tags by default', () => {
     const shouldCreateTag = updater.shouldCreateTag(mockPackages.npm);
+    expect(shouldCreateTag).toBe(true);
+  });
+
+  it('should respect create_tag config when set to false', () => {
+    const pkg = { ...mockPackages.npm, create_tag: false };
+    const shouldCreateTag = updater.shouldCreateTag(pkg);
     expect(shouldCreateTag).toBe(false);
+  });
+
+  it('should respect create_tag config when set to true', () => {
+    const pkg = { ...mockPackages.npm, create_tag: true };
+    const shouldCreateTag = updater.shouldCreateTag(pkg);
+    expect(shouldCreateTag).toBe(true);
   });
 
   it('should generate simple tag name', () => {
