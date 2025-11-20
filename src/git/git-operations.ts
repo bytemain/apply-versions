@@ -24,6 +24,52 @@ export class GitOperations {
     return !status.isClean();
   }
 
+  async hasFileChanges(filePath: string): Promise<boolean> {
+    try {
+      const status = await this.git.status();
+      const relativePath = filePath.startsWith(process.cwd())
+        ? filePath.replace(process.cwd() + '/', '')
+        : filePath;
+
+      return status.files.some(
+        (file) => file.path === relativePath || file.path === filePath,
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  async commitSingleFile(
+    filePath: string,
+    commitMessage: string,
+    dryRun: boolean = false,
+  ): Promise<GitOperationResult> {
+    if (dryRun) {
+      return {
+        success: true,
+        commitHash: 'dry-run',
+      };
+    }
+
+    try {
+      // Stage the file
+      await this.git.add(filePath);
+
+      // Create commit
+      const result = await this.git.commit(commitMessage);
+
+      return {
+        success: true,
+        commitHash: result.commit,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown git error',
+      };
+    }
+  }
+
   async stageAndCommit(
     pkg: PackageConfig,
     filePath: string,

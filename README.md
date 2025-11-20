@@ -1,5 +1,7 @@
 # apply-versions
 
+[![npm version](https://badge.fury.io/js/apply-versions.svg)](https://www.npmjs.com/package/apply-versions)
+
 A CLI tool for managing versions across multi-language monorepo projects. Automatically update versions in npm, Go, and Rust packages, with atomic Git commits and tag creation.
 
 ## Features
@@ -38,7 +40,8 @@ version = "1.2.3"
 
 [[package]]
 path = "go-service"
-name = "github.com/myorg/repo/go-service"
+name = "go-service"
+go_mod = "github.com/myorg/repo/go-service"
 type = "go"
 version = "0.5.0"
 
@@ -164,6 +167,7 @@ version = "1.0.0"                   # Required: Semantic version
 [[package]]
 path = "another/package"
 name = "another-package"
+go_mod = "xxx.com/package"
 type = "go"
 version = "2.3.4"
 ```
@@ -361,13 +365,15 @@ version = "1.5.3"
 
 [[package]]
 path = "services/auth"
-name = "github.com/myorg/monorepo/services/auth"
+name = "auth"
+go_mod = "github.com/myorg/monorepo/services/auth"
 type = "go"
 version = "0.8.0"
 
 [[package]]
 path = "services/api"
-name = "github.com/myorg/monorepo/services/api"
+name = "api"
+go_mod = "github.com/myorg/monorepo/services/api"
 type = "go"
 version = "1.0.0"
 

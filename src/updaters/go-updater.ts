@@ -115,10 +115,12 @@ export class GoPackageUpdater implements PackageUpdater {
 
   getTagName(pkg: PackageConfig): string {
     // For Go packages, include the path if not at root
-    if (pkg.path === '.' || pkg.path === '') {
+    // Use relativePath if available, otherwise fall back to path
+    const pkgPath = pkg.relativePath || pkg.path;
+    if (pkgPath === '.' || pkgPath === '') {
       return `v${pkg.version}`;
     }
 
-    return `${pkg.path}/v${pkg.version}`;
+    return `${pkgPath}/v${pkg.version}`;
   }
 }
