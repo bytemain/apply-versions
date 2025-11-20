@@ -1,5 +1,7 @@
 # apply-versions
 
+[![npm version](https://badge.fury.io/js/apply-versions.svg)](https://www.npmjs.com/package/apply-versions)
+
 A CLI tool for managing versions across multi-language monorepo projects. Automatically update versions in npm, Go, and Rust packages, with atomic Git commits and tag creation.
 
 ## Features
