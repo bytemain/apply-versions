@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('CLI - info current', () => {
   let testDir: string;
@@ -35,14 +35,14 @@ path = "."
     // Create package.json
     writeFileSync(
       join(testDir, 'package.json'),
-      JSON.stringify({ name: 'my-app', version: '0.9.0' }, null, 2)
+      JSON.stringify({ name: 'my-app', version: '0.9.0' }, null, 2),
     );
 
     // Run info current command
-    const result = execSync(
-      `node ${cliPath} info current`,
-      { cwd: testDir, encoding: 'utf8' }
-    );
+    const result = execSync(`node ${cliPath} info current`, {
+      cwd: testDir,
+      encoding: 'utf8',
+    });
 
     expect(result).toContain('Current Package Information');
     expect(result).toContain('my-app');
@@ -64,21 +64,21 @@ path = "."
     // Create package.json
     writeFileSync(
       join(testDir, 'package.json'),
-      JSON.stringify({ name: 'my-app', version: '0.9.0' }, null, 2)
+      JSON.stringify({ name: 'my-app', version: '0.9.0' }, null, 2),
     );
 
     // Run info current command with --json
-    const result = execSync(
-      `node ${cliPath} info current --json`,
-      { cwd: testDir, encoding: 'utf8' }
-    );
+    const result = execSync(`node ${cliPath} info current --json`, {
+      cwd: testDir,
+      encoding: 'utf8',
+    });
 
     const json = JSON.parse(result);
     expect(json).toEqual({
       name: 'my-app',
       version: '1.0.0',
       type: 'npm',
-      path: '.'
+      path: '.',
     });
   });
 
@@ -102,15 +102,15 @@ path = "packages/sub"
     // Create package.json
     writeFileSync(
       join(testDir, 'package.json'),
-      JSON.stringify({ name: 'my-app', version: '0.9.0' }, null, 2)
+      JSON.stringify({ name: 'my-app', version: '0.9.0' }, null, 2),
     );
 
     // Run info current command with --json from root
     // Should only match the root package (path = ".")
-    const result = execSync(
-      `node ${cliPath} info current --json`,
-      { cwd: testDir, encoding: 'utf8' }
-    );
+    const result = execSync(`node ${cliPath} info current --json`, {
+      cwd: testDir,
+      encoding: 'utf8',
+    });
 
     const json = JSON.parse(result);
     // Should be a single object, not an array
@@ -131,10 +131,11 @@ path = "packages/other"
 
     // Run info current command from root (no matching package)
     try {
-      execSync(
-        `node ${cliPath} info current`,
-        { cwd: testDir, encoding: 'utf8', stdio: 'pipe' }
-      );
+      execSync(`node ${cliPath} info current`, {
+        cwd: testDir,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      });
       expect.fail('Should have thrown an error');
     } catch (error: any) {
       expect(error.status).toBe(1);
@@ -155,10 +156,11 @@ path = "packages/other"
 
     // Run info current command with --json from root (no matching package)
     try {
-      execSync(
-        `node ${cliPath} info current --json`,
-        { cwd: testDir, encoding: 'utf8', stdio: 'pipe' }
-      );
+      execSync(`node ${cliPath} info current --json`, {
+        cwd: testDir,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      });
       expect.fail('Should have thrown an error');
     } catch (error: any) {
       expect(error.status).toBe(1);
@@ -183,13 +185,13 @@ path = "."
     // Create package.json
     writeFileSync(
       join(testDir, 'package.json'),
-      JSON.stringify({ name: 'my-app', version: '2.0.0' }, null, 2)
+      JSON.stringify({ name: 'my-app', version: '2.0.0' }, null, 2),
     );
 
     // Run info current command with custom config
     const result = execSync(
       `node ${cliPath} info current --config custom-versions.toml --json`,
-      { cwd: testDir, encoding: 'utf8' }
+      { cwd: testDir, encoding: 'utf8' },
     );
 
     const json = JSON.parse(result);
@@ -218,14 +220,14 @@ path = "packages/sub"
     mkdirSync(subDir, { recursive: true });
     writeFileSync(
       join(subDir, 'package.json'),
-      JSON.stringify({ name: 'sub-app', version: '1.5.0' }, null, 2)
+      JSON.stringify({ name: 'sub-app', version: '1.5.0' }, null, 2),
     );
 
     // Run info current command from subdirectory
-    const result = execSync(
-      `node ${cliPath} info current --json`,
-      { cwd: subDir, encoding: 'utf8' }
-    );
+    const result = execSync(`node ${cliPath} info current --json`, {
+      cwd: subDir,
+      encoding: 'utf8',
+    });
 
     const json = JSON.parse(result);
     expect(json.name).toBe('sub-app');

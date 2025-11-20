@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { execSync, spawn } from 'node:child_process';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('CLI bump command', () => {
   let testDir: string;
@@ -197,5 +197,25 @@ version = "2.0.0"
     // versions.toml should NOT be updated
     const tomlContent = await readFile(join(testDir, 'versions.toml'), 'utf-8');
     expect(tomlContent).toContain('version = "1.0.0"');
+  });
+
+  it('should bump prerelease version with --yes flag', async () => {
+    process.chdir(join(testDir, 'packages/service-a'));
+
+    execSync(`node ${join(originalCwd, 'dist/cli.js')} bump prerelease --yes`, {
+      encoding: 'utf-8',
+    });
+
+    // Check that versions.toml was updated with prerelease version
+    const tomlContent = await readFile(join(testDir, 'versions.toml'), 'utf-8');
+    expect(tomlContent).toContain('version = "1.0.1-alpha.0"');
+
+    // Check that package.json was updated
+    const pkgContent = await readFile(
+      join(testDir, 'packages/service-a/package.json'),
+      'utf-8',
+    );
+    const pkg = JSON.parse(pkgContent);
+    expect(pkg.version).toBe('1.0.1-alpha.0');
   });
 });
