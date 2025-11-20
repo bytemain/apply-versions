@@ -277,10 +277,10 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
     }
 
     // Calculate new versions for all packages
-    const bumpPlan = targetPackages.map(pkg => ({
+    const bumpPlan = targetPackages.map((pkg) => ({
       package: pkg,
       oldVersion: pkg.version,
-      newVersion: bumpVersion(pkg.version, bumpType)
+      newVersion: bumpVersion(pkg.version, bumpType),
     }));
 
     // Show what will be changed
@@ -288,7 +288,9 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
     for (const plan of bumpPlan) {
       console.log(`  ${plan.package.name}`);
       console.log(`    📁 Path: ${plan.package.path}`);
-      console.log(`    🔖 ${plan.oldVersion} → ${plan.newVersion} (${bumpType})\n`);
+      console.log(
+        `    🔖 ${plan.oldVersion} → ${plan.newVersion} (${bumpType})\n`,
+      );
     }
 
     // Ask for confirmation
@@ -311,7 +313,7 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
     console.log('\n📝 Committing versions.toml...');
     const git = simpleGit(configDir);
     await git.add(configPath);
-    const commitMessage = `chore: bump version${bumpPlan.length > 1 ? 's' : ''}\n\n${bumpPlan.map(p => `- ${p.package.name}: ${p.oldVersion} → ${p.newVersion}`).join('\n')}`;
+    const commitMessage = `chore: bump version${bumpPlan.length > 1 ? 's' : ''}\n\n${bumpPlan.map((p) => `- ${p.package.name}: ${p.oldVersion} → ${p.newVersion}`).join('\n')}`;
     await git.commit(commitMessage);
     console.log('✅ Committed versions.toml');
 
@@ -322,8 +324,10 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
     let updatedPackages = await parser.parse(configPath);
 
     // Filter to only the target packages
-    const targetNames = new Set(targetPackages.map(pkg => pkg.name));
-    updatedPackages = updatedPackages.filter(pkg => targetNames.has(pkg.name));
+    const targetNames = new Set(targetPackages.map((pkg) => pkg.name));
+    updatedPackages = updatedPackages.filter((pkg) =>
+      targetNames.has(pkg.name),
+    );
 
     // Convert paths to absolute
     updatedPackages = updatedPackages.map((pkg) => ({

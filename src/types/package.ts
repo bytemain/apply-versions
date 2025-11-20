@@ -11,6 +11,7 @@ export interface BasePackageConfig {
 
 export interface NpmPackageConfig extends BasePackageConfig {
   type: 'npm';
+  create_tag?: boolean;
 }
 
 export interface GoPackageConfig extends BasePackageConfig {
@@ -21,6 +22,7 @@ export interface GoPackageConfig extends BasePackageConfig {
 export interface CargoPackageConfig extends BasePackageConfig {
   type: 'cargo';
   update_workspace_deps?: boolean;
+  create_tag?: boolean;
 }
 
 export type PackageConfig =

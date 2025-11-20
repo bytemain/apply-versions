@@ -85,9 +85,12 @@ export class RustPackageUpdater implements PackageUpdater {
   }
 
   shouldCreateTag(pkg: PackageConfig): boolean {
-    // Rust packages typically don't create automatic Git tags
-    // This can be made configurable in the future if needed
-    return false;
+    // Check if create_tag is explicitly set in config
+    if (pkg.type === 'cargo' && pkg.create_tag !== undefined) {
+      return pkg.create_tag;
+    }
+    // Default to true for Rust packages
+    return true;
   }
 
   getTagName(pkg: PackageConfig): string {

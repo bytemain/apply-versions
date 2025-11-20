@@ -7,3 +7,4 @@ type = "npm"
 path = "."
 name = "apply-versions"
 version = "1.7.0"
+create_tag = true
