@@ -98,4 +98,12 @@ export class RustPackageUpdater implements PackageUpdater {
     // Could include crate name in the future: `${pkg.name}-v${pkg.version}`
     return `v${pkg.version}`;
   }
+
+  getPublishCommand(pkg: PackageConfig): string | undefined {
+    const pkgDir = pkg.relativePath && pkg.relativePath !== '.' ? pkg.relativePath : '.';
+    if (pkgDir === '.') {
+      return 'cargo publish';
+    }
+    return `cd ${pkgDir} && cargo publish`;
+  }
 }

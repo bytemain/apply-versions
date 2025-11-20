@@ -104,4 +104,12 @@ export class NpmPackageUpdater implements PackageUpdater {
     // Default npm tag format (rarely used)
     return `v${pkg.version}`;
   }
+
+  getPublishCommand(pkg: PackageConfig): string | undefined {
+    const pkgDir = pkg.relativePath && pkg.relativePath !== '.' ? pkg.relativePath : '.';
+    if (pkgDir === '.') {
+      return 'npm publish';
+    }
+    return `cd ${pkgDir} && npm publish`;
+  }
 }

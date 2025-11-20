@@ -5,6 +5,7 @@ import { ConfigParser } from './parsers/toml-parser.js';
 import { PackageProcessor } from './processors/index.js';
 import { ConsoleProgressObserver } from './observers/index.js';
 import { GitOperations } from './git/index.js';
+import { PackageUpdaterFactory } from './updaters/factory.js';
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { resolve, dirname, relative, join } from 'node:path';
 import * as readline from 'node:readline';
@@ -235,6 +236,36 @@ function autoFilterPackages(
 }
 
 /**
+ * Show next steps after successful update
+ */
+function showNextSteps(packages: any[]) {
+  console.log('\n📋 Next steps:');
+  console.log('\n  Push commits and tags:');
+  console.log('  $ git push && git push --tags');
+
+  // Collect publish commands from updaters
+  const publishCommands: string[] = [];
+  for (const pkg of packages) {
+    const updater = PackageUpdaterFactory.getUpdater(pkg.type);
+    if (updater.getPublishCommand) {
+      const cmd = updater.getPublishCommand(pkg);
+      if (cmd) {
+        publishCommands.push(cmd);
+      }
+    }
+  }
+
+  if (publishCommands.length > 0) {
+    console.log('\n  Publish packages:');
+    for (const cmd of publishCommands) {
+      console.log(`  $ ${cmd}`);
+    }
+  }
+
+  console.log();
+}
+
+/**
  * Handle bump command
  */
 async function handleBump(bumpType: BumpType, options: BumpOptions) {
@@ -348,6 +379,7 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
     }
 
     console.log('\n✅ Done!');
+    showNextSteps(updatedPackages);
     process.exit(0);
   } catch (error) {
     console.error(
@@ -650,6 +682,11 @@ async function handleApply(options: CLIOptions) {
 
     if (summary.updated === 0 && summary.skipped === 0) {
       process.exit(2); // Total failure
+    }
+
+    // Show next steps if not in dry run and updates were made
+    if (!options.dryRun && summary.updated > 0) {
+      showNextSteps(packages);
     }
 
     process.exit(0); // Success
