@@ -77,20 +77,41 @@ async function confirm(message: string): Promise<boolean> {
 /**
  * Prompt user to select bump type interactively
  */
-async function promptBumpType(): Promise<{
+async function promptBumpType(targetPackages: any[]): Promise<{
   type: BumpType;
   prereleaseId?: string;
 }> {
+  // Get current version(s) to show preview
+  const currentVersion = targetPackages[0]?.version || '0.0.0';
+  const hasMultiple = targetPackages.length > 1;
+
+  // Calculate preview versions for each bump type
+  const patchPreview = bumpVersion(currentVersion, 'patch');
+  const minorPreview = bumpVersion(currentVersion, 'minor');
+  const majorPreview = bumpVersion(currentVersion, 'major');
+  const prereleasePreview = bumpVersion(currentVersion, 'prerelease');
+
+  const suffix = hasMultiple ? ` (${targetPackages.length} packages)` : '';
+
   const response = await prompts({
     type: 'select',
     name: 'type',
     message: 'Select the version bump type:',
     choices: [
-      { title: 'Patch (x.x.X) - Bug fixes', value: 'patch' },
-      { title: 'Minor (x.X.0) - New features', value: 'minor' },
-      { title: 'Major (X.0.0) - Breaking changes', value: 'major' },
       {
-        title: 'Prerelease (x.x.X-id.0) - Pre-release version',
+        title: `Patch (${currentVersion} → ${patchPreview}) - Bug fixes${suffix}`,
+        value: 'patch',
+      },
+      {
+        title: `Minor (${currentVersion} → ${minorPreview}) - New features${suffix}`,
+        value: 'minor',
+      },
+      {
+        title: `Major (${currentVersion} → ${majorPreview}) - Breaking changes${suffix}`,
+        value: 'major',
+      },
+      {
+        title: `Prerelease (${currentVersion} → ${prereleasePreview}) - Pre-release version${suffix}`,
         value: 'prerelease',
       },
     ],
@@ -358,7 +379,7 @@ async function handleBump(
     let actualPrereleaseId = prereleaseId;
 
     if (!actualBumpType) {
-      const promptResult = await promptBumpType();
+      const promptResult = await promptBumpType(targetPackages);
       actualBumpType = promptResult.type;
       actualPrereleaseId = promptResult.prereleaseId;
     }
