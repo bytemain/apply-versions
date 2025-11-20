@@ -123,4 +123,9 @@ export class GoPackageUpdater implements PackageUpdater {
 
     return `${pkgPath}/v${pkg.version}`;
   }
+
+  getPublishCommand(pkg: PackageConfig): string | undefined {
+    // Go packages are published via Git tags, no additional command needed
+    return undefined;
+  }
 }

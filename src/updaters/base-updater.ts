@@ -20,4 +20,8 @@ export interface PackageUpdater {
   // Git tag related methods - each package type decides its own strategy
   shouldCreateTag(pkg: PackageConfig): boolean;
   getTagName(pkg: PackageConfig): string;
+
+  // Get the publish command for this package (optional)
+  // Returns undefined if the package type doesn't need publishing
+  getPublishCommand?(pkg: PackageConfig): string | undefined;
 }

@@ -11,6 +11,7 @@ import { GitOperations } from './git/index.js';
 import { ConsoleProgressObserver } from './observers/index.js';
 import { ConfigParser } from './parsers/toml-parser.js';
 import { PackageProcessor } from './processors/index.js';
+import { PackageUpdaterFactory } from './updaters/factory.js';
 
 interface CLIOptions {
   config: string;
@@ -329,6 +330,36 @@ function autoFilterPackages(
 }
 
 /**
+ * Show next steps after successful update
+ */
+function showNextSteps(packages: any[]) {
+  console.log('\n📋 Next steps:');
+  console.log('\n  Push commits and tags:');
+  console.log('  $ git push && git push --tags');
+
+  // Collect publish commands from updaters
+  const publishCommands: string[] = [];
+  for (const pkg of packages) {
+    const updater = PackageUpdaterFactory.getUpdater(pkg.type);
+    if (updater.getPublishCommand) {
+      const cmd = updater.getPublishCommand(pkg);
+      if (cmd) {
+        publishCommands.push(cmd);
+      }
+    }
+  }
+
+  if (publishCommands.length > 0) {
+    console.log('\n  Publish packages:');
+    for (const cmd of publishCommands) {
+      console.log(`  $ ${cmd}`);
+    }
+  }
+
+  console.log();
+}
+
+/**
  * Handle bump command
  */
 async function handleBump(
@@ -456,6 +487,7 @@ async function handleBump(
     }
 
     console.log('\n✅ Done!');
+    showNextSteps(updatedPackages);
     process.exit(0);
   } catch (error) {
     console.error(
@@ -472,82 +504,58 @@ async function handleBump(
 /**
  * Handle info current command
  */
-async function handleInfoCurrent(options: {
-  config?: string;
-  json: boolean;
-  verbose: boolean;
-}) {
+async function handleInfoCurrent(options: { config?: string; json: boolean; verbose: boolean }) {
   try {
     // Find config file
     const configPath = await resolveConfigPath(options.config);
-    const configDir = dirname(configPath);
-    const currentDir = process.cwd();
-    const relativeToConfig = relative(configDir, currentDir);
 
     if (options.verbose && !options.json) {
       console.log(`Configuration file: ${configPath}`);
-      console.log(`Current directory: ${currentDir}`);
-      console.log(`Relative path: ${relativeToConfig}`);
     }
 
-    // Parse config
+    // Parse config - show all packages from versions.toml
     const parser = new ConfigParser();
     const packages = await parser.parse(configPath);
 
-    // Find packages for current directory
-    const targetPackages = packages.filter((pkg) => {
-      const pkgPath = pkg.path === '.' ? '' : pkg.path;
-      return (
-        pkgPath === relativeToConfig ||
-        relativeToConfig.startsWith(pkgPath + '/') ||
-        pkgPath.startsWith(relativeToConfig + '/')
-      );
-    });
-
-    if (targetPackages.length === 0) {
+    if (packages.length === 0) {
       if (options.json) {
         console.error(
-          JSON.stringify(
-            {
-              error: 'No package found for current directory',
-              currentDirectory: relativeToConfig,
-            },
-            null,
-            2,
-          ),
+          JSON.stringify({
+            error: 'No packages found in configuration',
+          }, null, 2)
         );
       } else {
-        console.error(
-          `❌ Error: No package found for current directory: ${relativeToConfig}`,
-        );
+        console.error(`❌ Error: No packages found in ${configPath}`);
       }
       process.exit(1);
     }
 
     if (options.json) {
-      // Output package information as JSON
-      const output = targetPackages.map((pkg) => ({
+      // Output all packages as JSON
+      const output = packages.map(pkg => ({
         name: pkg.name,
         version: pkg.version,
         type: pkg.type,
-        path: pkg.path,
+        path: pkg.path
       }));
 
-      // If single package, output as object; if multiple, output as array
-      console.log(
-        JSON.stringify(output.length === 1 ? output[0] : output, null, 2),
-      );
+      console.log(JSON.stringify(output, null, 2));
     } else {
-      // Display as table
-      console.log('\n📦 Current Package Information:\n');
-
+      // Display all packages as table
+      console.log('\n📦 Package Information from versions.toml:\n');
+      
       const table = new Table({
         head: ['Package', 'Version', 'Type', 'Path'],
         colWidths: [40, 15, 10, 40],
       });
 
-      for (const pkg of targetPackages) {
-        table.push([pkg.name, pkg.version, pkg.type, pkg.path]);
+      for (const pkg of packages) {
+        table.push([
+          pkg.name,
+          pkg.version,
+          pkg.type,
+          pkg.path,
+        ]);
       }
 
       console.log(table.toString());
@@ -558,17 +566,10 @@ async function handleInfoCurrent(options: {
   } catch (error) {
     if (options.json) {
       console.error(
-        JSON.stringify(
-          {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            stack:
-              options.verbose && error instanceof Error
-                ? error.stack
-                : undefined,
-          },
-          null,
-          2,
-        ),
+        JSON.stringify({
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: options.verbose && error instanceof Error ? error.stack : undefined
+        }, null, 2)
       );
     } else {
       console.error(
@@ -654,30 +655,28 @@ async function main() {
     });
 
   // Info command
-  const info = program
-    .command('info')
-    .description('Display version information');
+  const info = program.command('info').description('Display version information');
 
   info
     .command('current')
-    .description(
-      'Display current version information for packages in the current directory',
-    )
+    .description('Display current version information for packages in the current directory')
     .option(
       '-c, --config <path>',
       'Path to versions.toml configuration file (default: search upwards from current directory)',
     )
-    .option('--json', 'Output in JSON format (for scripting)', false)
+    .option(
+      '--json',
+      'Output in JSON format (for scripting)',
+      false,
+    )
     .option(
       '-v, --verbose',
       'Show detailed output and debug information',
       false,
     )
-    .action(
-      async (options: { config?: string; json: boolean; verbose: boolean }) => {
-        await handleInfoCurrent(options);
-      },
-    );
+    .action(async (options: { config?: string; json: boolean; verbose: boolean }) => {
+      await handleInfoCurrent(options);
+    });
 
   program.parse();
 }
@@ -776,6 +775,11 @@ async function handleApply(options: CLIOptions) {
 
     if (summary.updated === 0 && summary.skipped === 0) {
       process.exit(2); // Total failure
+    }
+
+    // Show next steps if not in dry run and updates were made
+    if (!options.dryRun && summary.updated > 0) {
+      showNextSteps(packages);
     }
 
     process.exit(0); // Success
