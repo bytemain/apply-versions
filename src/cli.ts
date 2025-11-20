@@ -400,65 +400,48 @@ async function handleInfoCurrent(options: { config?: string; json: boolean; verb
   try {
     // Find config file
     const configPath = await resolveConfigPath(options.config);
-    const configDir = dirname(configPath);
-    const currentDir = process.cwd();
-    const relativeToConfig = relative(configDir, currentDir);
 
     if (options.verbose && !options.json) {
       console.log(`Configuration file: ${configPath}`);
-      console.log(`Current directory: ${currentDir}`);
-      console.log(`Relative path: ${relativeToConfig}`);
     }
 
-    // Parse config
+    // Parse config - show all packages from versions.toml
     const parser = new ConfigParser();
     const packages = await parser.parse(configPath);
 
-    // Find packages for current directory
-    const targetPackages = packages.filter((pkg) => {
-      const pkgPath = pkg.path === '.' ? '' : pkg.path;
-      return (
-        pkgPath === relativeToConfig ||
-        relativeToConfig.startsWith(pkgPath + '/') ||
-        pkgPath.startsWith(relativeToConfig + '/')
-      );
-    });
-
-    if (targetPackages.length === 0) {
+    if (packages.length === 0) {
       if (options.json) {
         console.error(
           JSON.stringify({
-            error: 'No package found for current directory',
-            currentDirectory: relativeToConfig
+            error: 'No packages found in configuration',
           }, null, 2)
         );
       } else {
-        console.error(`❌ Error: No package found for current directory: ${relativeToConfig}`);
+        console.error(`❌ Error: No packages found in ${configPath}`);
       }
       process.exit(1);
     }
 
     if (options.json) {
-      // Output package information as JSON
-      const output = targetPackages.map(pkg => ({
+      // Output all packages as JSON
+      const output = packages.map(pkg => ({
         name: pkg.name,
         version: pkg.version,
         type: pkg.type,
         path: pkg.path
       }));
 
-      // If single package, output as object; if multiple, output as array
-      console.log(JSON.stringify(output.length === 1 ? output[0] : output, null, 2));
+      console.log(JSON.stringify(output, null, 2));
     } else {
-      // Display as table
-      console.log('\n📦 Current Package Information:\n');
+      // Display all packages as table
+      console.log('\n📦 Package Information from versions.toml:\n');
       
       const table = new Table({
         head: ['Package', 'Version', 'Type', 'Path'],
         colWidths: [40, 15, 10, 40],
       });
 
-      for (const pkg of targetPackages) {
+      for (const pkg of packages) {
         table.push([
           pkg.name,
           pkg.version,
