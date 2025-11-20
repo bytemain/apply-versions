@@ -328,6 +328,7 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
     // Convert paths to absolute
     updatedPackages = updatedPackages.map((pkg) => ({
       ...pkg,
+      relativePath: pkg.path, // Keep original relative path for Git tags
       path: pkg.path === '.' ? configDir : resolve(configDir, pkg.path),
     }));
 
@@ -621,6 +622,7 @@ async function handleApply(options: CLIOptions) {
     // Convert relative paths to absolute paths for validation and processing
     packages = packages.map((pkg) => ({
       ...pkg,
+      relativePath: pkg.path, // Keep original relative path for Git tags
       path: pkg.path === '.' ? configDir : resolve(configDir, pkg.path),
     }));
 

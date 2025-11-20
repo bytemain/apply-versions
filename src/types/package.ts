@@ -3,7 +3,8 @@
 export type PackageType = 'npm' | 'go' | 'cargo';
 
 export interface BasePackageConfig {
-  path: string;
+  path: string; // Absolute path for file operations
+  relativePath?: string; // Original relative path from config (for Git tags)
   name: string;
   version: string;
 }
