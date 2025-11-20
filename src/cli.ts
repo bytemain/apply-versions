@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { ConfigParser } from './parsers/toml-parser.js';
 import { PackageProcessor } from './processors/index.js';
 import { ConsoleProgressObserver } from './observers/index.js';
+import { GitOperations } from './git/index.js';
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { resolve, dirname, relative, join } from 'node:path';
 import * as readline from 'node:readline';
@@ -438,6 +439,36 @@ async function handleApply(options: CLIOptions) {
       console.log(`Configuration file: ${configPath}`);
       console.log(`Dry run: ${options.dryRun}`);
       console.log(`Auto-confirm: ${options.yes}`);
+    }
+
+    // Check if versions.toml has uncommitted changes and commit them first
+    const gitOps = new GitOperations(configDir);
+    const hasVersionsTomlChanges = await gitOps.hasFileChanges(configPath);
+
+    if (hasVersionsTomlChanges) {
+      if (options.verbose) {
+        console.log('Detected uncommitted changes in versions.toml');
+      }
+
+      if (!options.dryRun) {
+        console.log('📝 Committing versions.toml changes...');
+        const commitResult = await gitOps.commitSingleFile(
+          configPath,
+          'chore: update versions in versions.toml',
+          options.dryRun,
+        );
+
+        if (commitResult.success) {
+          const prefix = options.dryRun ? 'Would commit' : 'Committed';
+          console.log(`✅ ${prefix} versions.toml changes`);
+        } else {
+          console.warn(
+            `⚠️  Failed to commit versions.toml: ${commitResult.error}`,
+          );
+        }
+      } else {
+        console.log('📝 Would commit versions.toml changes (dry run)');
+      }
     }
 
     // Read and parse configuration
