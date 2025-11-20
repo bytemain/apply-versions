@@ -102,6 +102,10 @@ npx apply-versions --verbose
 # Navigate to a package directory
 cd packages/core
 
+# Interactive mode - select version type with arrow keys
+npx apply-versions bump
+
+# Or directly specify the bump type
 # Bump patch version (1.2.3 -> 1.2.4)
 npx apply-versions bump patch
 
@@ -111,6 +115,9 @@ npx apply-versions bump minor
 # Bump major version (1.2.3 -> 2.0.0)
 npx apply-versions bump major
 
+# Bump prerelease version (1.2.3 -> 1.2.4-alpha.0)
+npx apply-versions bump prerelease
+
 # Skip confirmation
 npx apply-versions bump patch --yes
 
@@ -119,12 +126,17 @@ cd packages/core/src
 npx apply-versions bump patch  # Automatically finds and bumps core package
 ```
 
+**Interactive mode**: When you run `bump` without specifying a type, an interactive menu appears:
+- Use arrow keys to select: Patch, Minor, Major, or Prerelease
+- If Prerelease is selected, you'll be prompted to enter an identifier (e.g., alpha, beta, rc)
+
 The `bump` command:
 1. Finds `versions.toml` by searching upward
 2. Identifies the package(s) in current directory
-3. Calculates new version based on bump type
-4. Updates `versions.toml`
-5. Applies the changes (updates files, creates commit)
+3. Prompts for version type (if not specified)
+4. Calculates new version based on bump type
+5. Updates `versions.toml`
+6. Applies the changes (updates files, creates commit)
 
 See [BUMP.md](docs/BUMP.md) for detailed usage examples.
 
@@ -143,11 +155,14 @@ See [BUMP.md](docs/BUMP.md) for detailed usage examples.
 **Bump Command:**
 
 ```bash
-apply-versions bump <patch|minor|major> [options]
+apply-versions bump [type] [options]
 ```
+
+Where `[type]` is optional and can be: `patch`, `minor`, `major`, or `prerelease`. If not specified, an interactive prompt will be shown.
 
 | Option | Alias | Description | Default |
 |--------|-------|-------------|---------|
+| `--config <path>` | `-c` | Path to versions.toml configuration file | Auto-search upward |
 | `--yes` | `-y` | Skip confirmation prompt | `false` |
 | `--verbose` | `-v` | Show detailed output | `false` |
 
