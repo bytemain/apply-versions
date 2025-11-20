@@ -14,6 +14,7 @@ export interface NpmPackageConfig extends BasePackageConfig {
 
 export interface GoPackageConfig extends BasePackageConfig {
   type: 'go';
+  go_mod: string;
 }
 
 export interface CargoPackageConfig extends BasePackageConfig {
