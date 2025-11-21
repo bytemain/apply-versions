@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 
+import { access, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve } from 'node:path';
+import * as readline from 'node:readline';
+import Table from 'cli-table3';
 import { Command } from 'commander';
+import prompts from 'prompts';
+import { simpleGit } from 'simple-git';
+import { GitOperations } from './git/index.js';
+import { ConsoleProgressObserver } from './observers/index.js';
 import { ConfigParser } from './parsers/toml-parser.js';
 import { PackageProcessor } from './processors/index.js';
-import { ConsoleProgressObserver } from './observers/index.js';
-import { GitOperations } from './git/index.js';
 import { PackageUpdaterFactory } from './updaters/factory.js';
-import { readFile, writeFile, access } from 'node:fs/promises';
-import { resolve, dirname, relative, join } from 'node:path';
-import * as readline from 'node:readline';
-import { simpleGit } from 'simple-git';
-import Table from 'cli-table3';
 
 interface CLIOptions {
   config: string;
@@ -26,12 +27,16 @@ interface BumpOptions {
   verbose: boolean;
 }
 
-type BumpType = 'major' | 'minor' | 'patch';
+type BumpType = 'major' | 'minor' | 'patch' | 'prerelease';
 
 /**
  * Bump a semantic version
  */
-function bumpVersion(version: string, type: BumpType): string {
+function bumpVersion(
+  version: string,
+  type: BumpType,
+  prereleaseId?: string,
+): string {
   const parts = version.split('.').map(Number);
   if (parts.length !== 3 || parts.some(isNaN)) {
     throw new Error(`Invalid version format: ${version}`);
@@ -46,6 +51,10 @@ function bumpVersion(version: string, type: BumpType): string {
       return `${major}.${minor + 1}.0`;
     case 'patch':
       return `${major}.${minor}.${patch + 1}`;
+    case 'prerelease': {
+      const identifier = prereleaseId || 'alpha';
+      return `${major}.${minor}.${patch + 1}-${identifier}.0`;
+    }
   }
 }
 
@@ -64,6 +73,91 @@ async function confirm(message: string): Promise<boolean> {
       resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
     });
   });
+}
+
+/**
+ * Prompt user to select bump type interactively
+ */
+async function promptBumpType(targetPackages: any[]): Promise<{
+  type: BumpType;
+  prereleaseId?: string;
+}> {
+  // Get current version(s) to show preview
+  const currentVersion = targetPackages[0]?.version || '0.0.0';
+  const hasMultiple = targetPackages.length > 1;
+
+  // Calculate preview versions for each bump type
+  const patchPreview = bumpVersion(currentVersion, 'patch');
+  const minorPreview = bumpVersion(currentVersion, 'minor');
+  const majorPreview = bumpVersion(currentVersion, 'major');
+  const prereleasePreview = bumpVersion(currentVersion, 'prerelease');
+
+  const suffix = hasMultiple ? ` (${targetPackages.length} packages)` : '';
+
+  const response = await prompts({
+    type: 'select',
+    name: 'type',
+    message: 'Select the version bump type:',
+    choices: [
+      {
+        title: `Patch (${currentVersion} → ${patchPreview}) - Bug fixes${suffix}`,
+        value: 'patch',
+      },
+      {
+        title: `Minor (${currentVersion} → ${minorPreview}) - New features${suffix}`,
+        value: 'minor',
+      },
+      {
+        title: `Major (${currentVersion} → ${majorPreview}) - Breaking changes${suffix}`,
+        value: 'major',
+      },
+      {
+        title: `Prerelease (${currentVersion} → ${prereleasePreview}) - Pre-release version${suffix}`,
+        value: 'prerelease',
+      },
+    ],
+  });
+
+  // Handle user cancellation (Ctrl+C)
+  if (!response.type) {
+    console.log('\n❌ Cancelled');
+    process.exit(0);
+  }
+
+  const bumpType = response.type as BumpType;
+
+  // If prerelease is selected, ask for identifier
+  if (bumpType === 'prerelease') {
+    const prereleaseResponse = await prompts({
+      type: 'text',
+      name: 'identifier',
+      message: 'Enter prerelease identifier (e.g., alpha, beta, rc):',
+      initial: 'alpha',
+      validate: (value: string) => {
+        if (!value || value.trim() === '') {
+          return 'Prerelease identifier cannot be empty';
+        }
+        // Valid identifier: alphanumeric, hyphens, and dots
+        if (!/^[0-9A-Za-z-]+$/.test(value)) {
+          return 'Identifier must contain only letters, numbers, and hyphens';
+        }
+        return true;
+      },
+    });
+
+    // Handle user cancellation
+    if (!prereleaseResponse.identifier) {
+      console.log('\n❌ Cancelled');
+      process.exit(0);
+    }
+
+    return {
+      type: bumpType,
+      prereleaseId: prereleaseResponse.identifier.trim(),
+    };
+  }
+
+  return { type: bumpType };
 }
 
 /**
@@ -268,7 +362,11 @@ function showNextSteps(packages: any[]) {
 /**
  * Handle bump command
  */
-async function handleBump(bumpType: BumpType, options: BumpOptions) {
+async function handleBump(
+  bumpType: BumpType | undefined,
+  options: BumpOptions,
+  prereleaseId?: string,
+) {
   try {
     // Find config file
     const configPath = await resolveConfigPath(options.config);
@@ -307,11 +405,21 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
       console.log(`Found ${targetPackages.length} package(s) to bump`);
     }
 
+    // If no bump type provided, prompt the user
+    let actualBumpType = bumpType;
+    let actualPrereleaseId = prereleaseId;
+
+    if (!actualBumpType) {
+      const promptResult = await promptBumpType(targetPackages);
+      actualBumpType = promptResult.type;
+      actualPrereleaseId = promptResult.prereleaseId;
+    }
+
     // Calculate new versions for all packages
     const bumpPlan = targetPackages.map((pkg) => ({
       package: pkg,
       oldVersion: pkg.version,
-      newVersion: bumpVersion(pkg.version, bumpType),
+      newVersion: bumpVersion(pkg.version, actualBumpType!, actualPrereleaseId),
     }));
 
     // Show what will be changed
@@ -320,7 +428,7 @@ async function handleBump(bumpType: BumpType, options: BumpOptions) {
       console.log(`  ${plan.package.name}`);
       console.log(`    📁 Path: ${plan.package.path}`);
       console.log(
-        `    🔖 ${plan.oldVersion} → ${plan.newVersion} (${bumpType})\n`,
+        `    🔖 ${plan.oldVersion} → ${plan.newVersion} (${actualBumpType})\n`,
       );
     }
 
@@ -519,8 +627,10 @@ async function main() {
 
   // Bump command
   program
-    .command('bump <type>')
-    .description('Bump package version (major, minor, or patch)')
+    .command('bump [type]')
+    .description(
+      'Bump package version (major, minor, patch, or prerelease). If type is not specified, an interactive prompt will be shown.',
+    )
     .option(
       '-c, --config <path>',
       'Path to versions.toml configuration file (default: search upwards from current directory)',
@@ -535,13 +645,13 @@ async function main() {
       'Show detailed output and debug information',
       false,
     )
-    .action(async (type: string, options: BumpOptions) => {
-      if (!['major', 'minor', 'patch'].includes(type)) {
+    .action(async (type: string | undefined, options: BumpOptions) => {
+      if (type && !['major', 'minor', 'patch', 'prerelease'].includes(type)) {
         console.error(`❌ Error: Invalid bump type: ${type}`);
-        console.error('   Valid types: major, minor, patch');
+        console.error('   Valid types: major, minor, patch, prerelease');
         process.exit(1);
       }
-      await handleBump(type as BumpType, options);
+      await handleBump(type as BumpType | undefined, options);
     });
 
   // Info command
