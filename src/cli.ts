@@ -335,7 +335,7 @@ function autoFilterPackages(
 function showNextSteps(packages: any[]) {
   console.log('\n📋 Next steps:');
   console.log('\n  Push commits and tags:');
-  console.log('  $ git push && git push --tags');
+  console.log('    git push && git push --tags');
 
   // Collect publish commands from updaters
   const publishCommands: string[] = [];
@@ -352,7 +352,7 @@ function showNextSteps(packages: any[]) {
   if (publishCommands.length > 0) {
     console.log('\n  Publish packages:');
     for (const cmd of publishCommands) {
-      console.log(`  $ ${cmd}`);
+      console.log(`    ${cmd}`);
     }
   }
 
