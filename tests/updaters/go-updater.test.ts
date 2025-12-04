@@ -7,6 +7,7 @@ import { MockFileRepository, mockFiles, mockPackages } from '../test-utils.js';
 // Mock simple-git
 const mockGit = {
   tags: vi.fn(),
+  revparse: vi.fn(),
 };
 
 vi.mock('simple-git', () => ({
@@ -24,6 +25,8 @@ describe('GoPackageUpdater', () => {
     (updater as any).fileRepo = mockFileRepo;
     // Clear all mocks
     vi.clearAllMocks();
+    // Default mock for git root - use empty string to simulate running from git root
+    mockGit.revparse.mockResolvedValue('/repo');
   });
 
   it('should have correct type', () => {
@@ -49,7 +52,7 @@ describe('GoPackageUpdater', () => {
 
   it('should read version from git tags for root package', async () => {
     mockFileRepo.setFile(
-      'go.mod',
+      '/repo/go.mod',
       `module github.com/org/repo
 
 go 1.21
@@ -58,13 +61,14 @@ go 1.21
     mockGit.tags.mockResolvedValue({
       all: ['v1.0.0', 'v1.2.3', 'v0.9.0', 'services/api/v1.0.0'],
     });
+    mockGit.revparse.mockResolvedValue('/repo');
 
-    const version = await updater.readVersion('.');
+    const version = await updater.readVersion('/repo');
     expect(version).toBe('1.2.3'); // Latest version
   });
 
   it('should read version from git tags for subpath package', async () => {
-    mockFileRepo.setFile('services/api/go.mod', mockFiles.goMod);
+    mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
     mockGit.tags.mockResolvedValue({
       all: [
         'v1.0.0',
@@ -73,27 +77,29 @@ go 1.21
         'services/auth/v1.0.0',
       ],
     });
+    mockGit.revparse.mockResolvedValue('/repo');
 
-    const version = await updater.readVersion('services/api');
+    const version = await updater.readVersion('/repo/services/api');
     expect(version).toBe('2.1.0'); // Latest version for this package
   });
 
   it('should return default version when no git tags found', async () => {
-    mockFileRepo.setFile('services/api/go.mod', mockFiles.goMod);
+    mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
     mockGit.tags.mockResolvedValue({ all: [] });
+    mockGit.revparse.mockResolvedValue('/repo');
 
-    const version = await updater.readVersion('services/api');
+    const version = await updater.readVersion('/repo/services/api');
     expect(version).toBe('0.0.0');
   });
 
   it('should return default version when git operation fails', async () => {
-    mockFileRepo.setFile('services/api/go.mod', mockFiles.goMod);
+    mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
     mockGit.tags.mockRejectedValue(new Error('Not a git repository'));
 
     // Mock console.warn to avoid output during tests
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const version = await updater.readVersion('services/api');
+    const version = await updater.readVersion('/repo/services/api');
     expect(version).toBe('0.0.0');
     expect(warnSpy).toHaveBeenCalled();
 
@@ -107,20 +113,21 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 )
 `;
-    mockFileRepo.setFile('services/api/go.mod', invalidGoMod);
+    mockFileRepo.setFile('/repo/services/api/go.mod', invalidGoMod);
 
-    await expect(updater.readVersion('services/api')).rejects.toThrow(
-      'No module directive found in services/api/go.mod',
+    await expect(updater.readVersion('/repo/services/api')).rejects.toThrow(
+      'No module directive found in /repo/services/api/go.mod',
     );
   });
 
   it('should handle version update (no file modification)', async () => {
-    mockFileRepo.setFile('services/api/go.mod', mockFiles.goMod);
+    mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
     mockGit.tags.mockResolvedValue({
       all: ['services/api/v0.5.0'],
     });
+    mockGit.revparse.mockResolvedValue('/repo');
 
-    const result = await updater.updateVersion('services/api', '1.0.0', false);
+    const result = await updater.updateVersion('/repo/services/api', '1.0.0', false);
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -129,17 +136,18 @@ require (
     }
 
     // Go modules don't modify go.mod for version updates
-    const content = mockFileRepo.getFileContent('services/api/go.mod');
+    const content = mockFileRepo.getFileContent('/repo/services/api/go.mod');
     expect(content).toBe(mockFiles.goMod);
   });
 
   it('should handle dry run mode', async () => {
-    mockFileRepo.setFile('services/api/go.mod', mockFiles.goMod);
+    mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
     mockGit.tags.mockResolvedValue({
       all: ['services/api/v0.5.0'],
     });
+    mockGit.revparse.mockResolvedValue('/repo');
 
-    const result = await updater.updateVersion('services/api', '1.0.0', true);
+    const result = await updater.updateVersion('/repo/services/api', '1.0.0', true);
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -187,12 +195,13 @@ require (
 	github.com/spf13/cobra v1.7.0
 )
 `;
-    mockFileRepo.setFile('tools/generator/go.mod', complexGoMod);
+    mockFileRepo.setFile('/repo/tools/generator/go.mod', complexGoMod);
     mockGit.tags.mockResolvedValue({
       all: ['tools/generator/v3.0.0'],
     });
+    mockGit.revparse.mockResolvedValue('/repo');
 
-    const version = await updater.readVersion('tools/generator');
+    const version = await updater.readVersion('/repo/tools/generator');
     expect(version).toBe('3.0.0');
   });
 });

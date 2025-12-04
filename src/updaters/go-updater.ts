@@ -1,6 +1,6 @@
 // Go package updater
 
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { simpleGit } from 'simple-git';
 import { LocalFileRepository } from '../repositories/index.js';
 import type { PackageConfig, UpdateResult } from '../types/index.js';
@@ -35,8 +35,12 @@ export class GoPackageUpdater implements PackageUpdater {
       const git = simpleGit(process.cwd());
       const tags = await git.tags();
 
-      // Generate the tag prefix for this package
-      const tagPrefix = this.getTagPrefix(packagePath);
+      // Get git root to calculate relative path for tag matching
+      const gitRoot = await git.revparse(['--show-toplevel']);
+      const relativePath = relative(gitRoot.trim(), packagePath);
+
+      // Generate the tag prefix for this package using relative path
+      const tagPrefix = this.getTagPrefix(relativePath);
 
       // Find all tags that match this package
       const packageTags = tags.all
