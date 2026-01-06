@@ -8,6 +8,7 @@ import { MockFileRepository, mockFiles, mockPackages } from '../test-utils.js';
 const mockGit = {
   tags: vi.fn(),
   revparse: vi.fn(),
+  fetch: vi.fn(),
 };
 
 vi.mock('simple-git', () => ({
@@ -27,6 +28,8 @@ describe('GoPackageUpdater', () => {
     vi.clearAllMocks();
     // Default mock for git root - use empty string to simulate running from git root
     mockGit.revparse.mockResolvedValue('/repo');
+    // Default mock for fetch - succeeds by default
+    mockGit.fetch.mockResolvedValue(undefined);
   });
 
   it('should have correct type', () => {
@@ -92,6 +95,31 @@ go 1.21
     expect(version).toBe('0.0.0');
   });
 
+  it('should fetch tags from remote before reading version', async () => {
+    mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
+    mockGit.tags.mockResolvedValue({
+      all: ['services/api/v1.0.0'],
+    });
+    mockGit.revparse.mockResolvedValue('/repo');
+
+    await updater.readVersion('/repo/services/api');
+
+    expect(mockGit.fetch).toHaveBeenCalledWith(['--tags', '--force']);
+  });
+
+  it('should continue reading version even if fetch fails', async () => {
+    mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
+    mockGit.fetch.mockRejectedValue(new Error('No remote configured'));
+    mockGit.tags.mockResolvedValue({
+      all: ['services/api/v1.0.0'],
+    });
+    mockGit.revparse.mockResolvedValue('/repo');
+
+    const version = await updater.readVersion('/repo/services/api');
+
+    expect(version).toBe('1.0.0');
+  });
+
   it('should return default version when git operation fails', async () => {
     mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
     mockGit.tags.mockRejectedValue(new Error('Not a git repository'));
@@ -127,7 +155,11 @@ require (
     });
     mockGit.revparse.mockResolvedValue('/repo');
 
-    const result = await updater.updateVersion('/repo/services/api', '1.0.0', false);
+    const result = await updater.updateVersion(
+      '/repo/services/api',
+      '1.0.0',
+      false,
+    );
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -147,7 +179,11 @@ require (
     });
     mockGit.revparse.mockResolvedValue('/repo');
 
-    const result = await updater.updateVersion('/repo/services/api', '1.0.0', true);
+    const result = await updater.updateVersion(
+      '/repo/services/api',
+      '1.0.0',
+      true,
+    );
 
     expect(result.success).toBe(true);
     if (result.success) {

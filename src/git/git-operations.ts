@@ -19,6 +19,23 @@ export class GitOperations {
     }
   }
 
+  async fetchTags(): Promise<GitOperationResult> {
+    try {
+      // Fetch all tags from all remotes
+      await this.git.fetch(['--tags', '--force']);
+      return {
+        success: true,
+      };
+    } catch (error) {
+      // If fetch fails (e.g., no remote configured), we continue silently
+      // This allows the tool to work in local-only scenarios
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
   async hasUncommittedChanges(): Promise<boolean> {
     const status = await this.git.status();
     return !status.isClean();
@@ -132,6 +149,10 @@ export class GitOperations {
     }
 
     try {
+      // Fetch tags from remote to ensure we have the latest tags
+      // This prevents creating duplicate tags when local is out of sync
+      await this.fetchTags();
+
       // Check if tag already exists
       const tags = await this.git.tags();
       if (tags.all.includes(tagName)) {

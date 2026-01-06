@@ -106,7 +106,8 @@ export class NpmPackageUpdater implements PackageUpdater {
   }
 
   getPublishCommand(pkg: PackageConfig): string | undefined {
-    const pkgDir = pkg.relativePath && pkg.relativePath !== '.' ? pkg.relativePath : '.';
+    const pkgDir =
+      pkg.relativePath && pkg.relativePath !== '.' ? pkg.relativePath : '.';
     if (pkgDir === '.') {
       return 'npm publish';
     }

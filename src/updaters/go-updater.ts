@@ -33,6 +33,15 @@ export class GoPackageUpdater implements PackageUpdater {
     // We need to find the latest tag that matches this package path
     try {
       const git = simpleGit(process.cwd());
+
+      // Fetch tags from remote to ensure we have the latest tags
+      // This prevents detecting stale versions when local is out of sync
+      try {
+        await git.fetch(['--tags', '--force']);
+      } catch {
+        // If fetch fails (e.g., no remote configured), continue with local tags
+      }
+
       const tags = await git.tags();
 
       // Get git root to calculate relative path for tag matching
