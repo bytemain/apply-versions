@@ -36,6 +36,16 @@ export class GitOperations {
     }
   }
 
+  async getTags(): Promise<string[]> {
+    // Fetch tags from remote first to ensure we have the latest tags
+    // This prevents duplicate tags when local is out of sync with remote
+    // Fetch failures are ignored to support offline/local-only workflows
+    await this.fetchTags();
+
+    const tags = await this.git.tags();
+    return tags.all;
+  }
+
   async hasUncommittedChanges(): Promise<boolean> {
     const status = await this.git.status();
     return !status.isClean();
@@ -149,15 +159,9 @@ export class GitOperations {
     }
 
     try {
-      // Fetch tags from remote to ensure we have the latest tags
-      // This prevents creating duplicate tags when local is out of sync
-      // We intentionally ignore the result - if fetch fails (e.g., no remote, no network),
-      // we continue with local tags to support offline/local-only workflows
-      await this.fetchTags();
-
-      // Check if tag already exists
-      const tags = await this.git.tags();
-      if (tags.all.includes(tagName)) {
+      // Check if tag already exists (getTags fetches from remote first)
+      const tags = await this.getTags();
+      if (tags.includes(tagName)) {
         return {
           success: false,
           error: `Tag ${tagName} already exists`,

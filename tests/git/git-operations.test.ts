@@ -88,6 +88,38 @@ describe('GitOperations', () => {
     });
   });
 
+  describe('getTags', () => {
+    it('should fetch and return tags', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
+      mockGit.tags.mockResolvedValue({ all: ['v1.0.0', 'v1.1.0'] });
+
+      const result = await gitOps.getTags();
+
+      expect(result).toEqual(['v1.0.0', 'v1.1.0']);
+      expect(mockGit.fetch).toHaveBeenCalledWith(['--tags', '--force']);
+      expect(mockGit.tags).toHaveBeenCalled();
+    });
+
+    it('should return tags even if fetch fails', async () => {
+      mockGit.fetch.mockRejectedValue(new Error('No remote configured'));
+      mockGit.tags.mockResolvedValue({ all: ['v1.0.0'] });
+
+      const result = await gitOps.getTags();
+
+      expect(result).toEqual(['v1.0.0']);
+      expect(mockGit.tags).toHaveBeenCalled();
+    });
+
+    it('should return empty array when no tags exist', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
+      mockGit.tags.mockResolvedValue({ all: [] });
+
+      const result = await gitOps.getTags();
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('stageAndCommit', () => {
     const pkg = mockPackages.npm;
     const filePath = 'package.json';
