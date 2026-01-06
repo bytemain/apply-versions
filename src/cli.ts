@@ -504,7 +504,11 @@ async function handleBump(
 /**
  * Handle info current command
  */
-async function handleInfoCurrent(options: { config?: string; json: boolean; verbose: boolean }) {
+async function handleInfoCurrent(options: {
+  config?: string;
+  json: boolean;
+  verbose: boolean;
+}) {
   try {
     // Find config file
     const configPath = await resolveConfigPath(options.config);
@@ -520,9 +524,13 @@ async function handleInfoCurrent(options: { config?: string; json: boolean; verb
     if (packages.length === 0) {
       if (options.json) {
         console.error(
-          JSON.stringify({
-            error: 'No packages found in configuration',
-          }, null, 2)
+          JSON.stringify(
+            {
+              error: 'No packages found in configuration',
+            },
+            null,
+            2,
+          ),
         );
       } else {
         console.error(`❌ Error: No packages found in ${configPath}`);
@@ -532,30 +540,25 @@ async function handleInfoCurrent(options: { config?: string; json: boolean; verb
 
     if (options.json) {
       // Output all packages as JSON
-      const output = packages.map(pkg => ({
+      const output = packages.map((pkg) => ({
         name: pkg.name,
         version: pkg.version,
         type: pkg.type,
-        path: pkg.path
+        path: pkg.path,
       }));
 
       console.log(JSON.stringify(output, null, 2));
     } else {
       // Display all packages as table
       console.log('\n📦 Package Information from versions.toml:\n');
-      
+
       const table = new Table({
         head: ['Package', 'Version', 'Type', 'Path'],
         colWidths: [40, 15, 10, 40],
       });
 
       for (const pkg of packages) {
-        table.push([
-          pkg.name,
-          pkg.version,
-          pkg.type,
-          pkg.path,
-        ]);
+        table.push([pkg.name, pkg.version, pkg.type, pkg.path]);
       }
 
       console.log(table.toString());
@@ -566,10 +569,17 @@ async function handleInfoCurrent(options: { config?: string; json: boolean; verb
   } catch (error) {
     if (options.json) {
       console.error(
-        JSON.stringify({
-          error: error instanceof Error ? error.message : 'Unknown error',
-          stack: options.verbose && error instanceof Error ? error.stack : undefined
-        }, null, 2)
+        JSON.stringify(
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack:
+              options.verbose && error instanceof Error
+                ? error.stack
+                : undefined,
+          },
+          null,
+          2,
+        ),
       );
     } else {
       console.error(
@@ -655,28 +665,30 @@ async function main() {
     });
 
   // Info command
-  const info = program.command('info').description('Display version information');
+  const info = program
+    .command('info')
+    .description('Display version information');
 
   info
     .command('current')
-    .description('Display current version information for packages in the current directory')
+    .description(
+      'Display current version information for packages in the current directory',
+    )
     .option(
       '-c, --config <path>',
       'Path to versions.toml configuration file (default: search upwards from current directory)',
     )
-    .option(
-      '--json',
-      'Output in JSON format (for scripting)',
-      false,
-    )
+    .option('--json', 'Output in JSON format (for scripting)', false)
     .option(
       '-v, --verbose',
       'Show detailed output and debug information',
       false,
     )
-    .action(async (options: { config?: string; json: boolean; verbose: boolean }) => {
-      await handleInfoCurrent(options);
-    });
+    .action(
+      async (options: { config?: string; json: boolean; verbose: boolean }) => {
+        await handleInfoCurrent(options);
+      },
+    );
 
   program.parse();
 }

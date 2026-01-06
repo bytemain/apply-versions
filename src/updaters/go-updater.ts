@@ -2,6 +2,7 @@
 
 import { join, relative } from 'node:path';
 import { simpleGit } from 'simple-git';
+import { GitOperations } from '../git/index.js';
 import { LocalFileRepository } from '../repositories/index.js';
 import type { PackageConfig, UpdateResult } from '../types/index.js';
 import type { PackageUpdater } from './base-updater.js';
@@ -9,6 +10,7 @@ import type { PackageUpdater } from './base-updater.js';
 export class GoPackageUpdater implements PackageUpdater {
   readonly type = 'go' as const;
   private fileRepo = new LocalFileRepository();
+  private gitOps = new GitOperations();
 
   getPackageFilePath(packagePath: string): string {
     return join(packagePath, 'go.mod');
@@ -33,7 +35,9 @@ export class GoPackageUpdater implements PackageUpdater {
     // We need to find the latest tag that matches this package path
     try {
       const git = simpleGit(process.cwd());
-      const tags = await git.tags();
+
+      // Get tags (fetches from remote first to ensure we have the latest)
+      const allTags = await this.gitOps.getTags();
 
       // Get git root to calculate relative path for tag matching
       const gitRoot = await git.revparse(['--show-toplevel']);
@@ -43,7 +47,7 @@ export class GoPackageUpdater implements PackageUpdater {
       const tagPrefix = this.getTagPrefix(relativePath);
 
       // Find all tags that match this package
-      const packageTags = tags.all
+      const packageTags = allTags
         .filter((tag) => tag.startsWith(tagPrefix))
         .map((tag) => {
           // Extract version from tag (e.g., "v1.2.3" or "path/v1.2.3")

@@ -4,15 +4,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GoPackageUpdater } from '../../src/updaters/go-updater.js';
 import { MockFileRepository, mockFiles, mockPackages } from '../test-utils.js';
 
-// Mock simple-git
+// Mock simple-git (still needed for revparse)
 const mockGit = {
   tags: vi.fn(),
   revparse: vi.fn(),
+  fetch: vi.fn(),
 };
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn(() => mockGit),
 }));
+
+// Mock GitOperations - store the mock methods for later access
+const mockGetTags = vi.fn();
+const mockFetchTags = vi.fn();
+
+vi.mock('../../src/git/index.js', () => {
+  return {
+    GitOperations: class MockGitOperations {
+      getTags = mockGetTags;
+      fetchTags = mockFetchTags;
+    },
+  };
+});
 
 describe('GoPackageUpdater', () => {
   let updater: GoPackageUpdater;
@@ -27,6 +41,9 @@ describe('GoPackageUpdater', () => {
     vi.clearAllMocks();
     // Default mock for git root - use empty string to simulate running from git root
     mockGit.revparse.mockResolvedValue('/repo');
+    // Default mock for fetch - succeeds by default
+    mockGit.fetch.mockResolvedValue(undefined);
+    mockFetchTags.mockResolvedValue({ success: true });
   });
 
   it('should have correct type', () => {
@@ -58,9 +75,12 @@ describe('GoPackageUpdater', () => {
 go 1.21
 `,
     );
-    mockGit.tags.mockResolvedValue({
-      all: ['v1.0.0', 'v1.2.3', 'v0.9.0', 'services/api/v1.0.0'],
-    });
+    mockGetTags.mockResolvedValue([
+      'v1.0.0',
+      'v1.2.3',
+      'v0.9.0',
+      'services/api/v1.0.0',
+    ]);
     mockGit.revparse.mockResolvedValue('/repo');
 
     const version = await updater.readVersion('/repo');
@@ -69,14 +89,12 @@ go 1.21
 
   it('should read version from git tags for subpath package', async () => {
     mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
-    mockGit.tags.mockResolvedValue({
-      all: [
-        'v1.0.0',
-        'services/api/v2.1.0',
-        'services/api/v2.0.0',
-        'services/auth/v1.0.0',
-      ],
-    });
+    mockGetTags.mockResolvedValue([
+      'v1.0.0',
+      'services/api/v2.1.0',
+      'services/api/v2.0.0',
+      'services/auth/v1.0.0',
+    ]);
     mockGit.revparse.mockResolvedValue('/repo');
 
     const version = await updater.readVersion('/repo/services/api');
@@ -85,16 +103,26 @@ go 1.21
 
   it('should return default version when no git tags found', async () => {
     mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
-    mockGit.tags.mockResolvedValue({ all: [] });
+    mockGetTags.mockResolvedValue([]);
     mockGit.revparse.mockResolvedValue('/repo');
 
     const version = await updater.readVersion('/repo/services/api');
     expect(version).toBe('0.0.0');
   });
 
+  it('should use getTags which fetches from remote before reading version', async () => {
+    mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
+    mockGetTags.mockResolvedValue(['services/api/v1.0.0']);
+    mockGit.revparse.mockResolvedValue('/repo');
+
+    await updater.readVersion('/repo/services/api');
+
+    expect(mockGetTags).toHaveBeenCalled();
+  });
+
   it('should return default version when git operation fails', async () => {
     mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
-    mockGit.tags.mockRejectedValue(new Error('Not a git repository'));
+    mockGetTags.mockRejectedValue(new Error('Not a git repository'));
 
     // Mock console.warn to avoid output during tests
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -122,12 +150,14 @@ require (
 
   it('should handle version update (no file modification)', async () => {
     mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
-    mockGit.tags.mockResolvedValue({
-      all: ['services/api/v0.5.0'],
-    });
+    mockGetTags.mockResolvedValue(['services/api/v0.5.0']);
     mockGit.revparse.mockResolvedValue('/repo');
 
-    const result = await updater.updateVersion('/repo/services/api', '1.0.0', false);
+    const result = await updater.updateVersion(
+      '/repo/services/api',
+      '1.0.0',
+      false,
+    );
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -142,12 +172,14 @@ require (
 
   it('should handle dry run mode', async () => {
     mockFileRepo.setFile('/repo/services/api/go.mod', mockFiles.goMod);
-    mockGit.tags.mockResolvedValue({
-      all: ['services/api/v0.5.0'],
-    });
+    mockGetTags.mockResolvedValue(['services/api/v0.5.0']);
     mockGit.revparse.mockResolvedValue('/repo');
 
-    const result = await updater.updateVersion('/repo/services/api', '1.0.0', true);
+    const result = await updater.updateVersion(
+      '/repo/services/api',
+      '1.0.0',
+      true,
+    );
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -196,9 +228,7 @@ require (
 )
 `;
     mockFileRepo.setFile('/repo/tools/generator/go.mod', complexGoMod);
-    mockGit.tags.mockResolvedValue({
-      all: ['tools/generator/v3.0.0'],
-    });
+    mockGetTags.mockResolvedValue(['tools/generator/v3.0.0']);
     mockGit.revparse.mockResolvedValue('/repo');
 
     const version = await updater.readVersion('/repo/tools/generator');

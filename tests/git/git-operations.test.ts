@@ -11,6 +11,7 @@ const mockGit = {
   commit: vi.fn(),
   tags: vi.fn(),
   addTag: vi.fn(),
+  fetch: vi.fn(),
 };
 
 vi.mock('simple-git', () => ({
@@ -55,6 +56,67 @@ describe('GitOperations', () => {
 
       const result = await gitOps.hasUncommittedChanges();
       expect(result).toBe(true);
+    });
+  });
+
+  describe('fetchTags', () => {
+    it('should fetch tags successfully', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
+
+      const result = await gitOps.fetchTags();
+
+      expect(result.success).toBe(true);
+      expect(mockGit.fetch).toHaveBeenCalledWith(['--tags', '--force']);
+    });
+
+    it('should handle fetch failure gracefully', async () => {
+      mockGit.fetch.mockRejectedValue(new Error('No remote configured'));
+
+      const result = await gitOps.fetchTags();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('No remote configured');
+    });
+
+    it('should handle unknown error types', async () => {
+      mockGit.fetch.mockRejectedValue('String error');
+
+      const result = await gitOps.fetchTags();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unknown error');
+    });
+  });
+
+  describe('getTags', () => {
+    it('should fetch and return tags', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
+      mockGit.tags.mockResolvedValue({ all: ['v1.0.0', 'v1.1.0'] });
+
+      const result = await gitOps.getTags();
+
+      expect(result).toEqual(['v1.0.0', 'v1.1.0']);
+      expect(mockGit.fetch).toHaveBeenCalledWith(['--tags', '--force']);
+      expect(mockGit.tags).toHaveBeenCalled();
+    });
+
+    it('should return tags even if fetch fails', async () => {
+      mockGit.fetch.mockRejectedValue(new Error('No remote configured'));
+      mockGit.tags.mockResolvedValue({ all: ['v1.0.0'] });
+
+      const result = await gitOps.getTags();
+
+      expect(result).toEqual(['v1.0.0']);
+      expect(mockGit.tags).toHaveBeenCalled();
+    });
+
+    it('should return empty array when no tags exist', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
+      mockGit.tags.mockResolvedValue({ all: [] });
+
+      const result = await gitOps.getTags();
+
+      expect(result).toEqual([]);
     });
   });
 
@@ -150,7 +212,34 @@ describe('GitOperations', () => {
     const tagName = 'v1.0.0';
 
     it('should create tag successfully', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
       mockGit.tags.mockResolvedValue({ all: ['v0.9.0'] });
+      mockGit.addTag.mockResolvedValue(undefined);
+
+      const result = await gitOps.createTag(tagName, false);
+
+      expect(result.success).toBe(true);
+      expect(result.tagName).toBe(tagName);
+      expect(mockGit.fetch).toHaveBeenCalledWith(['--tags', '--force']);
+      expect(mockGit.tags).toHaveBeenCalled();
+      expect(mockGit.addTag).toHaveBeenCalledWith(tagName);
+    });
+
+    it('should fetch tags from remote before creating', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
+      mockGit.tags.mockResolvedValue({ all: [] });
+      mockGit.addTag.mockResolvedValue(undefined);
+
+      await gitOps.createTag(tagName, false);
+
+      // Verify fetch is called before checking/creating tags
+      expect(mockGit.fetch).toHaveBeenCalledWith(['--tags', '--force']);
+      expect(mockGit.fetch).toHaveBeenCalledBefore(mockGit.tags);
+    });
+
+    it('should continue creating tag even if fetch fails', async () => {
+      mockGit.fetch.mockRejectedValue(new Error('No remote configured'));
+      mockGit.tags.mockResolvedValue({ all: [] });
       mockGit.addTag.mockResolvedValue(undefined);
 
       const result = await gitOps.createTag(tagName, false);
@@ -166,11 +255,13 @@ describe('GitOperations', () => {
 
       expect(result.success).toBe(true);
       expect(result.tagName).toBe(tagName);
+      expect(mockGit.fetch).not.toHaveBeenCalled();
       expect(mockGit.tags).not.toHaveBeenCalled();
       expect(mockGit.addTag).not.toHaveBeenCalled();
     });
 
     it('should fail if tag already exists', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
       mockGit.tags.mockResolvedValue({ all: ['v0.9.0', 'v1.0.0'] });
 
       const result = await gitOps.createTag(tagName, false);
@@ -180,7 +271,19 @@ describe('GitOperations', () => {
       expect(mockGit.addTag).not.toHaveBeenCalled();
     });
 
+    it('should detect remote tags after fetch and prevent duplicate', async () => {
+      // Simulate a tag that exists on remote but not locally before fetch
+      mockGit.fetch.mockResolvedValue(undefined);
+      mockGit.tags.mockResolvedValue({ all: ['v0.9.0', 'v1.0.0'] });
+
+      const result = await gitOps.createTag(tagName, false);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Tag v1.0.0 already exists');
+    });
+
     it('should handle git tags failure', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
       mockGit.tags.mockRejectedValue(new Error('Failed to list tags'));
 
       const result = await gitOps.createTag(tagName, false);
@@ -190,6 +293,7 @@ describe('GitOperations', () => {
     });
 
     it('should handle git addTag failure', async () => {
+      mockGit.fetch.mockResolvedValue(undefined);
       mockGit.tags.mockResolvedValue({ all: [] });
       mockGit.addTag.mockRejectedValue(new Error('Failed to create tag'));
 
