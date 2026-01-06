@@ -151,6 +151,8 @@ export class GitOperations {
     try {
       // Fetch tags from remote to ensure we have the latest tags
       // This prevents creating duplicate tags when local is out of sync
+      // We intentionally ignore the result - if fetch fails (e.g., no remote, no network),
+      // we continue with local tags to support offline/local-only workflows
       await this.fetchTags();
 
       // Check if tag already exists
