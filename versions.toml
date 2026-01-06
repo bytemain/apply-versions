@@ -6,5 +6,5 @@
 type = "npm"
 path = "."
 name = "apply-versions"
-version = "1.9.1"
+version = "1.9.2"
 create_tag = true
