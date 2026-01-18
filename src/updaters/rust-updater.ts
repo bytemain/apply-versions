@@ -9,7 +9,7 @@ import type { PackageUpdater } from './base-updater.js';
 interface CargoToml {
   package?: {
     name?: string;
-    version?: string | { workspace?: boolean };
+    version?: string | { workspace: true };
     [key: string]: unknown;
   };
   workspace?: {
@@ -141,13 +141,11 @@ export class RustPackageUpdater implements PackageUpdater {
             )}`,
           );
         }
-        if (workspaceUpdate.updated) {
-          updatedFiles.add(this.getPackageFilePath(workspaceInfo.rootPath));
-          workspaceInfo = {
-            ...workspaceInfo,
-            content: workspaceUpdate.content,
-          };
-        }
+        updatedFiles.add(this.getPackageFilePath(workspaceInfo.rootPath));
+        workspaceInfo = {
+          ...workspaceInfo,
+          content: workspaceUpdate.content,
+        };
 
         const workspaceMemberUpdate = await this.updateWorkspaceMembers(
           workspaceInfo.rootPath,
@@ -291,9 +289,8 @@ export class RustPackageUpdater implements PackageUpdater {
     const workspacePath = this.getPackageFilePath(workspaceRoot);
     const workspaceContent = await this.fileRepo.read(workspacePath);
     const workspaceCargo = TOML.parse(workspaceContent) as CargoToml;
-    const members = Array.isArray(workspaceCargo.workspace?.members)
-      ? workspaceCargo.workspace!.members
-      : [];
+    const workspaceMembers = workspaceCargo.workspace?.members;
+    const members = Array.isArray(workspaceMembers) ? workspaceMembers : [];
 
     if (members.length === 0) {
       return workspaceRoot;
@@ -309,7 +306,7 @@ export class RustPackageUpdater implements PackageUpdater {
   }
 
   private async findWorkspaceRoot(packagePath: string): Promise<string | null> {
-    let currentDir = packagePath && packagePath !== '' ? packagePath : '.';
+    let currentDir = packagePath || '.';
 
     while (true) {
       const cargoPath = this.getPackageFilePath(currentDir);
@@ -382,12 +379,18 @@ export class RustPackageUpdater implements PackageUpdater {
     }
 
     const updatedLines = section.body.split('\n').map((line) => {
-      const entryMatch = line.match(/^\s*([A-Za-z0-9_.-]+)\s*=\s*(.+)$/);
+      const entryMatch = line.match(
+        /^\s*(?:"([^"]+)"|([A-Za-z0-9_.-]+))\s*=\s*(.+)$/,
+      );
       if (!entryMatch) {
         return line;
       }
 
-      const [, depName, value] = entryMatch;
+      const depName = entryMatch[1] ?? entryMatch[2];
+      const value = entryMatch[3];
+      if (!depName) {
+        return line;
+      }
       if (!workspacePackageNames.has(depName)) {
         return line;
       }
@@ -397,10 +400,18 @@ export class RustPackageUpdater implements PackageUpdater {
         return line.replace(stringMatch[0], `"${newVersion}"${stringMatch[2]}`);
       }
 
+      const versionMatch = value.match(/(version\s*=\s*")([^"]+)(")/);
+      if (!versionMatch) {
+        return line;
+      }
+
       const updatedValue = value.replace(
-        /(version\s*=\s*")([^"]+)(")/,
-        `$1${newVersion}$3`,
+        versionMatch[0],
+        `${versionMatch[1]}${newVersion}${versionMatch[3]}`,
       );
+      if (updatedValue === value) {
+        return line;
+      }
       return line.replace(value, updatedValue);
     });
 
@@ -422,9 +433,8 @@ export class RustPackageUpdater implements PackageUpdater {
     newVersion: string,
     dryRun: boolean,
   ): Promise<{ updatedFiles: string[]; memberNames: Set<string> }> {
-    const members = Array.isArray(workspaceCargo.workspace?.members)
-      ? workspaceCargo.workspace!.members
-      : [];
+    const workspaceMembers = workspaceCargo.workspace?.members;
+    const members = Array.isArray(workspaceMembers) ? workspaceMembers : [];
     const updatedFiles: string[] = [];
     const memberNames = new Set<string>();
 
@@ -484,15 +494,31 @@ export class RustPackageUpdater implements PackageUpdater {
         return true;
       }
 
-      if (member.endsWith('/*')) {
-        const prefix = member.slice(0, -1);
-        if (relativePath.startsWith(prefix)) {
+      if (member.includes('*')) {
+        const pattern = this.getWorkspaceGlobPattern(member);
+        if (pattern.test(relativePath)) {
           return true;
         }
       }
     }
 
     return false;
+  }
+
+  private getWorkspaceGlobPattern(pattern: string): RegExp {
+    const escaped = pattern
+      .split(/(\*\*|\*)/)
+      .map((part) => {
+        if (part === '**') {
+          return '.*';
+        }
+        if (part === '*') {
+          return '[^/]*';
+        }
+        return part.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+      })
+      .join('');
+    return new RegExp(`^${escaped}$`);
   }
 
   private getSectionRange(
@@ -508,7 +534,7 @@ export class RustPackageUpdater implements PackageUpdater {
 
     const start = headerMatch.index + headerMatch[0].length;
     const rest = content.slice(start);
-    const nextHeaderIndex = rest.search(/\n\[[^\]]+\]/);
+    const nextHeaderIndex = rest.search(/\n\[\[?[^\]\n]+\]\]?\s*(?:\r?\n|$)/);
     const end =
       nextHeaderIndex === -1 ? content.length : start + nextHeaderIndex;
     const body = content.slice(start, end);
