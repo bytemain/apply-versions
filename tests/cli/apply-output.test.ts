@@ -52,8 +52,6 @@ version = "2.0.0"
   });
 
   it('should hide skipped packages by default', () => {
-    process.chdir(testDir);
-
     const output = execSync(
       `node ${join(originalCwd, 'dist/cli.js')} --dry-run`,
       { encoding: 'utf-8' },
@@ -66,8 +64,6 @@ version = "2.0.0"
   });
 
   it('should show skipped packages when verbose', () => {
-    process.chdir(testDir);
-
     const output = execSync(
       `node ${join(originalCwd, 'dist/cli.js')} --dry-run --verbose`,
       { encoding: 'utf-8' },
