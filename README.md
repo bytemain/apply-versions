@@ -234,6 +234,10 @@ version = "2.0.0"
 update_workspace_deps = true  # Update other crates that depend on myorg-core
 ```
 
+#### Cargo workspaces with `version.workspace`
+If your workspace defines `[workspace.package]` with a shared version and member crates use `version.workspace = true`,
+apply-versions updates the workspace package version and keeps matching entries in `[workspace.dependencies]` in sync.
+
 #### `create_tag` (optional, npm and Rust only)
 Whether to create a Git tag when applying version changes. By default, tags are created for all package types.
 
@@ -729,4 +733,3 @@ MIT
 - [DESIGN.md](./DESIGN.md) - Detailed design documentation and architecture
 - [Go Modules in Multi-Module Repositories](https://go.dev/wiki/Modules#faqs--multi-module-repositories)
 - [Semantic Versioning](https://semver.org/)
-
