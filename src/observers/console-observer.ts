@@ -15,6 +15,7 @@ export class ConsoleProgressObserver implements ProgressObserver {
   constructor(
     private dryRun: boolean = false,
     private autoConfirm: boolean = false,
+    private showSkipped: boolean = false,
   ) {}
 
   onAnalysisStart(packageCount: number): void {
@@ -31,7 +32,7 @@ export class ConsoleProgressObserver implements ProgressObserver {
       this.displayChangesTable(toUpdate);
     }
 
-    if (toSkip.length > 0) {
+    if (this.showSkipped && toSkip.length > 0) {
       console.log('\nThe following packages are already at target version:\n');
       for (const change of toSkip) {
         console.log(
@@ -81,6 +82,10 @@ export class ConsoleProgressObserver implements ProgressObserver {
   }
 
   onPackageSkipped(pkg: PackageConfig, reason: string): void {
+    if (!this.showSkipped) {
+      return;
+    }
+
     console.log(`\n⊘ Skipping ${pkg.name} (${pkg.type})`);
     console.log(`  ${reason}`);
   }
@@ -89,7 +94,7 @@ export class ConsoleProgressObserver implements ProgressObserver {
     const prefix = this.dryRun ? '[DRY RUN] ' : '';
     console.log(`\n✅ ${prefix}Summary:`);
     console.log(`  - ${summary.updated} packages updated`);
-    if (summary.skipped > 0) {
+    if (this.showSkipped && summary.skipped > 0) {
       console.log(`  - ${summary.skipped} packages skipped`);
     }
     if (summary.failed > 0) {
@@ -131,7 +136,7 @@ export class ConsoleProgressObserver implements ProgressObserver {
   private displaySummary(summary: ChangeSummary): void {
     console.log('\nSummary:');
     console.log(`  • ${summary.toUpdate} packages will be updated`);
-    if (summary.toSkip > 0) {
+    if (this.showSkipped && summary.toSkip > 0) {
       console.log(`  • ${summary.toSkip} packages will be skipped`);
     }
     console.log(`  • ${summary.commits} commits will be created`);
