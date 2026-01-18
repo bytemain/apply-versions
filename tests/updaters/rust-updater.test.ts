@@ -43,6 +43,37 @@ describe('RustPackageUpdater', () => {
     expect(version).toBe('1.0.0');
   });
 
+  it('should read version from workspace package', async () => {
+    const workspaceCargo = `[workspace]
+members = ["crates/core"]
+
+[workspace.package]
+version = "1.2.3"
+`;
+    mockFileRepo.setFile('Cargo.toml', workspaceCargo);
+
+    const version = await updater.readVersion('.');
+    expect(version).toBe('1.2.3');
+  });
+
+  it('should read version from workspace root when using version.workspace', async () => {
+    const workspaceCargo = `[workspace]
+members = ["crates/core"]
+
+[workspace.package]
+version = "1.4.0"
+`;
+    const memberCargo = `[package]
+name = "myorg-core"
+version.workspace = true
+`;
+    mockFileRepo.setFile('Cargo.toml', workspaceCargo);
+    mockFileRepo.setFile('crates/core/Cargo.toml', memberCargo);
+
+    const version = await updater.readVersion('crates/core');
+    expect(version).toBe('1.4.0');
+  });
+
   it('should throw error for Cargo.toml without version', async () => {
     const cargoWithoutVersion = `[package]
 name = "myorg-server"
@@ -85,6 +116,50 @@ tokio = { version = "1.0", features = ["full"] }
     );
     expect(updatedContent).toMatchSnapshot();
     expect(updatedContent).toContain('name = "myorg-server"'); // Other fields preserved
+  });
+
+  it('should update workspace package, members, and dependencies', async () => {
+    const workspaceCargo = `[workspace]
+members = ["crates/core", "crates/app"]
+
+[workspace.package]
+version = "1.0.0"
+
+[workspace.dependencies]
+myorg-core = { path = "crates/core", version = "1.0.0" }
+myorg-app = { path = "crates/app", version = "1.0.0" }
+serde = "1.0"
+`;
+    const coreCargo = `[package]
+name = "myorg-core"
+version = "1.0.0"
+`;
+    const appCargo = `[package]
+name = "myorg-app"
+version.workspace = true
+`;
+    mockFileRepo.setFile('Cargo.toml', workspaceCargo);
+    mockFileRepo.setFile('crates/core/Cargo.toml', coreCargo);
+    mockFileRepo.setFile('crates/app/Cargo.toml', appCargo);
+
+    const result = await updater.updateVersion('crates/core', '2.0.0', false);
+
+    expect(result.success).toBe(true);
+
+    const updatedWorkspace = mockFileRepo.getFileContent('Cargo.toml');
+    expect(updatedWorkspace).toContain('version = "2.0.0"');
+    expect(updatedWorkspace).toContain(
+      'myorg-core = { path = "crates/core", version = "2.0.0" }',
+    );
+    expect(updatedWorkspace).toContain(
+      'myorg-app = { path = "crates/app", version = "2.0.0" }',
+    );
+    expect(updatedWorkspace).toContain('serde = "1.0"');
+
+    const updatedCore = mockFileRepo.getFileContent('crates/core/Cargo.toml');
+    expect(updatedCore).toContain('version = "2.0.0"');
+    const updatedApp = mockFileRepo.getFileContent('crates/app/Cargo.toml');
+    expect(updatedApp).toContain('version.workspace = true');
   });
 
   it('should preserve formatting when updating version', async () => {
