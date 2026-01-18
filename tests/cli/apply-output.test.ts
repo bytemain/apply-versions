@@ -12,28 +12,28 @@ describe('CLI apply output filtering', () => {
     originalCwd = process.cwd();
     testDir = join(tmpdir(), `apply-versions-output-${Date.now()}`);
 
-    await mkdir(join(testDir, 'packages/go-service'), { recursive: true });
-    await mkdir(join(testDir, 'packages/node-service'), { recursive: true });
+    await mkdir(join(testDir, 'packages/node-app'), { recursive: true });
+    await mkdir(join(testDir, 'packages/node-lib'), { recursive: true });
 
     await writeFile(
-      join(testDir, 'packages/go-service/package.json'),
-      JSON.stringify({ name: 'go-service', version: '1.0.0' }, null, 2),
+      join(testDir, 'packages/node-app/package.json'),
+      JSON.stringify({ name: 'node-app', version: '1.0.0' }, null, 2),
     );
     await writeFile(
-      join(testDir, 'packages/node-service/package.json'),
-      JSON.stringify({ name: 'node-service', version: '2.0.0' }, null, 2),
+      join(testDir, 'packages/node-lib/package.json'),
+      JSON.stringify({ name: 'node-lib', version: '2.0.0' }, null, 2),
     );
 
     const versionsToml = `[[package]]
 type = "npm"
-path = "packages/go-service"
-name = "go-service"
+path = "packages/node-app"
+name = "node-app"
 version = "1.1.0"
 
 [[package]]
 type = "npm"
-path = "packages/node-service"
-name = "node-service"
+path = "packages/node-lib"
+name = "node-lib"
 version = "2.0.0"
 `;
     await writeFile(join(testDir, 'versions.toml'), versionsToml);
@@ -59,8 +59,8 @@ version = "2.0.0"
       { encoding: 'utf-8' },
     );
 
-    expect(output).toContain('go-service');
-    expect(output).not.toContain('node-service');
+    expect(output).toContain('node-app');
+    expect(output).not.toContain('node-lib');
     expect(output).not.toContain('already at target version');
     expect(output).not.toContain('packages skipped');
   });
@@ -73,8 +73,8 @@ version = "2.0.0"
       { encoding: 'utf-8' },
     );
 
-    expect(output).toContain('go-service');
-    expect(output).toContain('node-service');
+    expect(output).toContain('node-app');
+    expect(output).toContain('node-lib');
     expect(output).toContain('already at target version');
     expect(output).toContain('packages skipped');
   });
