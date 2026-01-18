@@ -525,7 +525,7 @@ export class RustPackageUpdater implements PackageUpdater {
     content: string,
     sectionHeader: string,
   ): CargoSectionRange | null {
-    const escapedHeader = sectionHeader.replace(/\./g, '\\.');
+    const escapedHeader = sectionHeader.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const headerRegex = new RegExp(`^\\[${escapedHeader}\\]\\s*$`, 'm');
     const headerMatch = content.match(headerRegex);
     if (!headerMatch || headerMatch.index === undefined) {
