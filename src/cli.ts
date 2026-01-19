@@ -476,7 +476,7 @@ async function handleBump(
     }));
 
     // Create observer and processor
-    const observer = new ConsoleProgressObserver(false, true);
+    const observer = new ConsoleProgressObserver(false, true, options.verbose);
     const processor = new PackageProcessor(observer, false);
 
     // Process the package
@@ -772,7 +772,11 @@ async function handleApply(options: CLIOptions) {
     }
 
     // Create observer
-    const observer = new ConsoleProgressObserver(options.dryRun, options.yes);
+    const observer = new ConsoleProgressObserver(
+      options.dryRun,
+      options.yes,
+      options.verbose,
+    );
 
     // Create processor
     const processor = new PackageProcessor(observer, options.dryRun);
