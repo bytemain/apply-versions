@@ -13,6 +13,7 @@ A CLI tool for managing versions across multi-language monorepo projects. Automa
 - 🔍 **Dry Run Mode**: Preview changes before applying them
 - ✨ **Zero Config**: Works out of the box with sensible defaults
 - 📦 **Bump Command**: Quick version bumping from any subdirectory
+- 📝 **Version Files**: Regex-based version replacement in arbitrary files (TypeScript, Python, YAML, etc.)
 - 🔍 **Auto-Discovery**: Finds `versions.toml` by searching upward from current directory
 
 ## Installation
@@ -237,6 +238,60 @@ update_workspace_deps = true  # Update other crates that depend on myorg-core
 #### Cargo workspaces with `version.workspace`
 If your workspace defines `[workspace.package]` with a shared version and member crates use `version.workspace = true`,
 apply-versions updates the workspace package version and keeps matching entries in `[workspace.dependencies]` in sync.
+
+#### `version_files` (optional)
+Additional files that contain version strings to be updated via regex patterns. Useful for updating version constants in source code files (e.g., TypeScript, Python, YAML).
+
+Each entry has two fields:
+- `path` - File path relative to the package directory
+- `pattern` - A string pattern used to find and replace the version. Supports a `{{version}}` placeholder that matches any semver-like version string.
+
+**`{{version}}` placeholder mode** (recommended):
+
+The `{{version}}` placeholder matches version strings like `1.2.3`, `1.2.3-beta.1`, or `1.2.3+build.456`. The surrounding text is treated as literal characters.
+
+```toml
+[[package]]
+path = "packages/core"
+name = "@myorg/core"
+type = "npm"
+version = "2.0.0"
+
+[[package.version_files]]
+path = "src/version.ts"
+pattern = 'VERSION = "{{version}}"'
+
+[[package.version_files]]
+path = "src/config.ts"
+pattern = "API_VERSION = '{{version}}'"
+```
+
+This will find `VERSION = "1.0.0"` in `src/version.ts` and replace it with `VERSION = "2.0.0"`.
+
+**Raw regex mode** (advanced):
+
+For more control, you can use a raw regex pattern. Use a named capture group `(?<version>...)` or a regular capture group `(...)` to indicate which part should be replaced with the new version.
+
+```toml
+[[package.version_files]]
+path = "src/version.ts"
+pattern = 'version = "(?<version>\d+\.\d+\.\d+)"'
+```
+
+**Inline array syntax**:
+
+You can also use TOML inline array syntax:
+
+```toml
+[[package]]
+path = "."
+name = "my-app"
+type = "npm"
+version = "1.0.0"
+version_files = [
+  { path = "src/version.ts", pattern = 'VERSION = "{{version}}"' },
+]
+```
 
 #### `create_tag` (optional, npm and Rust only)
 Whether to create a Git tag when applying version changes. By default, tags are created for all package types.
@@ -621,6 +676,36 @@ version = "2.1.0"
   ✓ Updated crates/app/Cargo.toml
   ✓ Committed changes
 ```
+
+### Version Files Example (Custom Version Constants)
+
+If your project has version constants in source files (e.g., TypeScript, Python), you can use `version_files` to keep them in sync automatically.
+
+**Source file** (`src/version.ts`):
+```typescript
+export const VERSION = "1.0.0";
+export const APP_NAME = "my-app";
+```
+
+**Configuration** (`versions.toml`):
+```toml
+[[package]]
+path = "."
+name = "my-app"
+type = "npm"
+version = "2.0.0"
+
+[[package.version_files]]
+path = "src/version.ts"
+pattern = 'VERSION = "{{version}}"'
+```
+
+**What happens**:
+1. Updates `package.json` version to `2.0.0` (standard npm update)
+2. Finds `VERSION = "1.0.0"` in `src/version.ts` and replaces it with `VERSION = "2.0.0"`
+3. Both files are staged and committed together
+
+This works with any file type — Python (`__version__ = "{{version}}"`), YAML (`version: '{{version}}'`), or any text file containing a version string.
 
 ## Error Handling
 

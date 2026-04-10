@@ -2,11 +2,17 @@
 
 export type PackageType = 'npm' | 'go' | 'cargo';
 
+export interface VersionFileConfig {
+  path: string; // File path relative to the package path
+  pattern: string; // Regex pattern string with {{version}} placeholder
+}
+
 export interface BasePackageConfig {
   path: string; // Absolute path for file operations
   relativePath?: string; // Original relative path from config (for Git tags)
   name: string;
   version: string;
+  version_files?: VersionFileConfig[];
 }
 
 export interface NpmPackageConfig extends BasePackageConfig {
