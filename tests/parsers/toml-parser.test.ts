@@ -99,4 +99,52 @@ update_workspace_deps = true
       update_workspace_deps: true,
     });
   });
+
+  it('should parse package with version_files field', async () => {
+    const configPath = join(testDir, 'version-files.toml');
+    const config = `[[package]]
+path = "packages/web"
+name = "@myorg/web"
+type = "npm"
+version = "1.2.3"
+
+[[package.version_files]]
+path = "src/version.ts"
+pattern = 'VERSION = "{{version}}"'
+
+[[package.version_files]]
+path = "src/config.ts"
+pattern = 'API_VERSION = "{{version}}"'
+`;
+    await writeFile(configPath, config);
+
+    const packages = await parser.parse(configPath);
+
+    expect(packages).toHaveLength(1);
+    expect(packages[0].version_files).toEqual([
+      { path: 'src/version.ts', pattern: 'VERSION = "{{version}}"' },
+      { path: 'src/config.ts', pattern: 'API_VERSION = "{{version}}"' },
+    ]);
+  });
+
+  it('should parse package with inline version_files', async () => {
+    const configPath = join(testDir, 'inline-version-files.toml');
+    const config = `[[package]]
+path = "."
+name = "my-app"
+type = "npm"
+version = "1.0.0"
+version_files = [
+  { path = "src/version.ts", pattern = 'VERSION = "{{version}}"' },
+]
+`;
+    await writeFile(configPath, config);
+
+    const packages = await parser.parse(configPath);
+
+    expect(packages).toHaveLength(1);
+    expect(packages[0].version_files).toEqual([
+      { path: 'src/version.ts', pattern: 'VERSION = "{{version}}"' },
+    ]);
+  });
 });

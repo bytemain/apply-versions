@@ -9,12 +9,13 @@ import type {
   ProcessResult,
   Summary,
 } from '../types/index.js';
-import { PackageUpdaterFactory } from '../updaters/index.js';
+import { PackageUpdaterFactory, RegexFileUpdater } from '../updaters/index.js';
 import { createValidationChain } from '../validators/index.js';
 
 export class PackageProcessor {
   private gitOps: GitOperations;
   private validator = createValidationChain();
+  private regexFileUpdater = new RegexFileUpdater();
 
   constructor(
     private observer: ProgressObserver,
@@ -153,6 +154,21 @@ export class PackageProcessor {
         };
       }
 
+      // Process version_files (regex-based file updates)
+      const additionalFiles = [...(updateResult.additionalFiles ?? [])];
+      if (config.version_files && config.version_files.length > 0) {
+        const regexResult = await this.regexFileUpdater.updateVersionFiles(
+          config.path,
+          config.version_files,
+          config.version,
+          this.dryRun,
+        );
+        additionalFiles.push(...regexResult.updatedFiles);
+        for (const error of regexResult.errors) {
+          this.observer.onError(error);
+        }
+      }
+
       this.observer.onPackageComplete(config, updateResult);
 
       // Git operations
@@ -163,7 +179,7 @@ export class PackageProcessor {
         updateResult.oldVersion,
         updateResult.newVersion,
         this.dryRun,
-        updateResult.additionalFiles,
+        additionalFiles.length > 0 ? additionalFiles : undefined,
       );
 
       if (!gitResult.success) {
