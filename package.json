@@ -1,6 +1,10 @@
 {
   "name": "apply-versions",
   "version": "1.9.2",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bytemain/apply-versions.git"
+  },
   "type": "module",
   "exports": {
     ".": {
