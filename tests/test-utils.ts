@@ -164,7 +164,13 @@ export class MockFileRepository {
 
   private normalize(path: string): string {
     // Strip leading "./" and trailing slashes for consistent keys
-    const p = path.replace(/^\.\/+/, '').replace(/\/+$/, '');
+    let p = path;
+    while (p.startsWith('./')) {
+      p = p.slice(2);
+    }
+    while (p.endsWith('/')) {
+      p = p.slice(0, -1);
+    }
     if (p === '.' || p === '') return '';
     return p;
   }
