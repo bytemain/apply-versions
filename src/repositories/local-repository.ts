@@ -1,7 +1,7 @@
 // Local file repository implementation
 
-import { access, readFile, writeFile } from 'node:fs/promises';
-import type { FileRepository } from './file-repository.js';
+import { access, readdir, readFile, writeFile } from 'node:fs/promises';
+import type { DirectoryEntry, FileRepository } from './file-repository.js';
 
 export class LocalFileRepository implements FileRepository {
   async read(path: string): Promise<string> {
@@ -18,6 +18,18 @@ export class LocalFileRepository implements FileRepository {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async listDir(path: string): Promise<DirectoryEntry[]> {
+    try {
+      const entries = await readdir(path, { withFileTypes: true });
+      return entries.map((entry) => ({
+        name: entry.name,
+        isDirectory: entry.isDirectory(),
+      }));
+    } catch {
+      return [];
     }
   }
 }

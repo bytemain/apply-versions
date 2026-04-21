@@ -677,6 +677,74 @@ version = "2.1.0"
   ✓ Committed changes
 ```
 
+### npm Workspace Example (Yarn / pnpm / npm)
+
+For "fake monorepos" where multiple npm packages live in one repo, reference each other by **real semver versions** (not `workspace:*`), and are published independently with `npm publish`, `apply-versions` will keep cross-package references in sync automatically.
+
+**Auto-detection**: when bumping an npm package, `apply-versions` walks up from the package directory looking for a `package.json` that defines a `workspaces` field (either the array form `["packages/*"]` or the object form `{ "packages": ["packages/*"] }`). If one is found, workspace mode kicks in.
+
+**In workspace mode**, for each bumped package:
+
+1. The package's own `version` is updated.
+2. Every other workspace member's `package.json` is scanned. Any entry under `dependencies` / `devDependencies` / `peerDependencies` / `optionalDependencies` whose key matches the bumped package's `name` has its version updated, **preserving the original range prefix** (`^1.2.3` → `^2.0.0`, `~1.2.3` → `~2.0.0`, `>=1.2.3` → `>=2.0.0`, exact `1.2.3` → `2.0.0`).
+3. The bumped package's `package.json` and all updated sibling `package.json` files land in the **same atomic Git commit**.
+4. Per-package `npm install` is **skipped** in workspace mode.
+
+After all packages are processed, `apply-versions` runs **a single install at the workspace root**, picking the package manager from the root `package.json`'s `packageManager` field (`yarn` / `pnpm` / `npm`). When `packageManager` is missing, it defaults to `npm install`.
+
+The following entries are intentionally **not** rewritten:
+
+- `workspace:*`, `workspace:^`, `workspace:~`, `workspace:1.2.3`
+- `file:`, `link:`, `npm:`, `git:`, `git+`, `github:`, `http(s):` URLs
+- Tag-style ranges such as `latest`, `next`
+- Wildcards: `*`, `x`
+
+**Repository structure**:
+```
+my-monorepo/
+├── package.json            # workspaces: ["packages/*"], packageManager: "yarn@4.0.2"
+├── versions.toml
+└── packages/
+    ├── core/
+    │   └── package.json    # name: "@myorg/core", version: "1.0.0"
+    └── app/
+        └── package.json    # name: "@myorg/app", deps: { "@myorg/core": "^1.0.0" }
+```
+
+**Root package.json**:
+```json
+{
+  "name": "my-monorepo",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "packageManager": "yarn@4.0.2"
+}
+```
+
+**versions.toml**:
+```toml
+[[package]]
+type = "npm"
+path = "packages/core"
+name = "@myorg/core"
+version = "2.0.0"
+
+[[package]]
+type = "npm"
+path = "packages/app"
+name = "@myorg/app"
+version = "1.1.0"
+```
+
+**What happens** when running `npx apply-versions`:
+
+1. `packages/core/package.json` is bumped to `2.0.0`.
+2. `packages/app/package.json` has its `dependencies["@myorg/core"]` rewritten from `^1.0.0` to `^2.0.0` and is staged into the **same commit** as the core bump.
+3. `packages/app/package.json` is bumped to `1.1.0` in its own commit.
+4. After all packages are processed, **one** `yarn install` runs at the repo root to refresh the lockfile.
+
+If your root uses `pnpm@9.x` or `npm@10.x` in `packageManager`, the root install will use that tool instead.
+
 ### Version Files Example (Custom Version Constants)
 
 If your project has version constants in source files (e.g., TypeScript, Python), you can use `version_files` to keep them in sync automatically.

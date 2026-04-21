@@ -24,4 +24,11 @@ export interface PackageUpdater {
   // Get the publish command for this package (optional)
   // Returns undefined if the package type doesn't need publishing
   getPublishCommand?(pkg: PackageConfig): string | undefined;
+
+  /**
+   * Optional hook invoked once after all packages of this type have been
+   * processed. Useful for batched side effects such as running a single
+   * workspace-level install.
+   */
+  finalize?(dryRun: boolean): Promise<void>;
 }
