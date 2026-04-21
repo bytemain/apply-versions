@@ -101,11 +101,12 @@ export class MockFileRepository {
   private files = new Map<string, string>();
 
   setFile(path: string, content: string): void {
-    this.files.set(path, content);
+    this.files.set(this.normalize(path), content);
   }
 
   async read(path: string): Promise<string> {
-    const content = this.files.get(path);
+    const key = this.normalize(path);
+    const content = this.files.get(key);
     if (content === undefined) {
       throw new Error(`ENOENT: no such file or directory, open '${path}'`);
     }
@@ -113,11 +114,44 @@ export class MockFileRepository {
   }
 
   async write(path: string, content: string): Promise<void> {
-    this.files.set(path, content);
+    this.files.set(this.normalize(path), content);
   }
 
   async exists(path: string): Promise<boolean> {
-    return this.files.has(path);
+    return this.files.has(this.normalize(path));
+  }
+
+  async listDir(
+    path: string,
+  ): Promise<Array<{ name: string; isDirectory: boolean }>> {
+    const prefix = this.normalize(path);
+    const prefixWithSep = prefix === '' ? '' : `${prefix}/`;
+    const directDirs = new Set<string>();
+    const directFiles = new Set<string>();
+
+    for (const filePath of this.files.keys()) {
+      if (prefixWithSep && !filePath.startsWith(prefixWithSep)) {
+        if (prefix === '' && !filePath.includes('/')) {
+          directFiles.add(filePath);
+        }
+        continue;
+      }
+      const remainder = prefixWithSep
+        ? filePath.slice(prefixWithSep.length)
+        : filePath;
+      if (!remainder) continue;
+      const slashIdx = remainder.indexOf('/');
+      if (slashIdx === -1) {
+        directFiles.add(remainder);
+      } else {
+        directDirs.add(remainder.slice(0, slashIdx));
+      }
+    }
+
+    return [
+      ...Array.from(directDirs).map((name) => ({ name, isDirectory: true })),
+      ...Array.from(directFiles).map((name) => ({ name, isDirectory: false })),
+    ];
   }
 
   clear(): void {
@@ -125,7 +159,14 @@ export class MockFileRepository {
   }
 
   getFileContent(path: string): string | undefined {
-    return this.files.get(path);
+    return this.files.get(this.normalize(path));
+  }
+
+  private normalize(path: string): string {
+    // Strip leading "./" and trailing slashes for consistent keys
+    const p = path.replace(/^\.\/+/, '').replace(/\/+$/, '');
+    if (p === '.' || p === '') return '';
+    return p;
   }
 }
 

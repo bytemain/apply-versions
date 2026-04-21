@@ -48,6 +48,7 @@ export class PackageProcessor {
 
     // Execution phase
     const results: ProcessResult[] = [];
+    const usedUpdaterTypes = new Set<string>();
 
     for (const change of changes) {
       if (!change.needsUpdate) {
@@ -63,8 +64,27 @@ export class PackageProcessor {
         continue;
       }
 
+      usedUpdaterTypes.add(change.config.type);
       const result = await this.processPackage(change);
       results.push(result);
+    }
+
+    // Finalize phase: invoke optional finalize hook on each updater that ran
+    for (const type of Array.from(usedUpdaterTypes)) {
+      const updater = PackageUpdaterFactory.getUpdater(
+        type as PackageConfig['type'],
+      );
+      if (updater.finalize) {
+        try {
+          await updater.finalize(this.dryRun);
+        } catch (error) {
+          this.observer.onError(
+            `Finalization failed for ${type} updater: ${
+              error instanceof Error ? error.message : 'Unknown error'
+            }`,
+          );
+        }
+      }
     }
 
     // Complete

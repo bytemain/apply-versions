@@ -289,7 +289,285 @@ describe('NpmPackageUpdater', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain('npm install failed');
+      expect(result.error).toContain('failed with exit code');
     }
+  });
+
+  describe('workspace mode', () => {
+    function makeSuccessSpawn() {
+      return vi.fn(() => {
+        const mockProcess: any = {
+          on: vi.fn((event: string, callback: (code?: number) => void) => {
+            if (event === 'close') {
+              setTimeout(() => callback(0), 0);
+            }
+          }),
+        };
+        return mockProcess;
+      });
+    }
+
+    function setRootPackageJson(
+      repo: MockFileRepository,
+      pkg: Record<string, unknown>,
+    ) {
+      repo.setFile('package.json', `${JSON.stringify(pkg, null, 2)}\n`);
+    }
+
+    function setMember(
+      repo: MockFileRepository,
+      path: string,
+      pkg: Record<string, unknown>,
+    ) {
+      repo.setFile(`${path}/package.json`, `${JSON.stringify(pkg, null, 2)}\n`);
+    }
+
+    it('detects yarn workspace and updates sibling deps in same atomic commit', async () => {
+      setRootPackageJson(mockFileRepo, {
+        name: 'root',
+        private: true,
+        workspaces: ['packages/*'],
+        packageManager: 'yarn@4.0.2',
+      });
+      setMember(mockFileRepo, 'packages/core', {
+        name: '@myorg/core',
+        version: '1.0.0',
+      });
+      setMember(mockFileRepo, 'packages/app', {
+        name: '@myorg/app',
+        version: '1.0.0',
+        dependencies: { '@myorg/core': '^1.0.0' },
+        devDependencies: { typescript: '^5.0.0' },
+      });
+      setMember(mockFileRepo, 'packages/lib', {
+        name: '@myorg/lib',
+        version: '0.5.0',
+        peerDependencies: { '@myorg/core': '~1.0.0' },
+        optionalDependencies: { '@myorg/core': '>=1.0.0' },
+      });
+
+      mockSpawn.mockImplementation(makeSuccessSpawn() as any);
+
+      const result = await updater.updateVersion(
+        'packages/core',
+        '2.0.0',
+        false,
+      );
+
+      expect(result.success).toBe(true);
+      // No per-package npm install should run during updateVersion in workspace mode
+      expect(mockSpawn).not.toHaveBeenCalled();
+
+      const appPkg = JSON.parse(
+        mockFileRepo.getFileContent('packages/app/package.json')!,
+      );
+      expect(appPkg.dependencies['@myorg/core']).toBe('^2.0.0');
+      // Unrelated deps untouched
+      expect(appPkg.devDependencies.typescript).toBe('^5.0.0');
+
+      const libPkg = JSON.parse(
+        mockFileRepo.getFileContent('packages/lib/package.json')!,
+      );
+      expect(libPkg.peerDependencies['@myorg/core']).toBe('~2.0.0');
+      expect(libPkg.optionalDependencies['@myorg/core']).toBe('>=2.0.0');
+
+      // The bumped package itself
+      const corePkg = JSON.parse(
+        mockFileRepo.getFileContent('packages/core/package.json')!,
+      );
+      expect(corePkg.version).toBe('2.0.0');
+
+      // Updated sibling files are returned for the atomic commit, but not
+      // the package's own package.json (that's the primary file)
+      if (result.success) {
+        const additional = result.additionalFiles ?? [];
+        expect(additional).toEqual(
+          expect.arrayContaining([
+            'packages/app/package.json',
+            'packages/lib/package.json',
+          ]),
+        );
+        // Lockfile should NOT be in per-package commit in workspace mode
+        expect(additional).not.toContain('packages/core/package-lock.json');
+      }
+    });
+
+    it('skips workspace:/file:/link:/git/tag/wildcard ranges', async () => {
+      setRootPackageJson(mockFileRepo, {
+        name: 'root',
+        private: true,
+        workspaces: ['packages/*'],
+      });
+      setMember(mockFileRepo, 'packages/core', {
+        name: '@myorg/core',
+        version: '1.0.0',
+      });
+      setMember(mockFileRepo, 'packages/app', {
+        name: '@myorg/app',
+        version: '1.0.0',
+        dependencies: {
+          '@myorg/core': 'workspace:^',
+        },
+        devDependencies: {
+          '@myorg/core': 'file:../core',
+        },
+        peerDependencies: {
+          '@myorg/core': '*',
+        },
+        optionalDependencies: {
+          '@myorg/core': 'latest',
+        },
+      });
+
+      mockSpawn.mockImplementation(makeSuccessSpawn() as any);
+
+      const result = await updater.updateVersion(
+        'packages/core',
+        '2.0.0',
+        false,
+      );
+
+      expect(result.success).toBe(true);
+      const appPkg = JSON.parse(
+        mockFileRepo.getFileContent('packages/app/package.json')!,
+      );
+      expect(appPkg.dependencies['@myorg/core']).toBe('workspace:^');
+      expect(appPkg.devDependencies['@myorg/core']).toBe('file:../core');
+      expect(appPkg.peerDependencies['@myorg/core']).toBe('*');
+      expect(appPkg.optionalDependencies['@myorg/core']).toBe('latest');
+      if (result.success) {
+        // No sibling updates means no extra files staged
+        expect(result.additionalFiles ?? []).toEqual([]);
+      }
+    });
+
+    it('dry run does not write files or run install', async () => {
+      setRootPackageJson(mockFileRepo, {
+        name: 'root',
+        private: true,
+        workspaces: ['packages/*'],
+        packageManager: 'pnpm@9.0.0',
+      });
+      setMember(mockFileRepo, 'packages/core', {
+        name: '@myorg/core',
+        version: '1.0.0',
+      });
+      setMember(mockFileRepo, 'packages/app', {
+        name: '@myorg/app',
+        version: '1.0.0',
+        dependencies: { '@myorg/core': '^1.0.0' },
+      });
+
+      mockSpawn.mockImplementation(makeSuccessSpawn() as any);
+
+      const result = await updater.updateVersion(
+        'packages/core',
+        '2.0.0',
+        true,
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSpawn).not.toHaveBeenCalled();
+
+      const corePkg = JSON.parse(
+        mockFileRepo.getFileContent('packages/core/package.json')!,
+      );
+      expect(corePkg.version).toBe('1.0.0');
+      const appPkg = JSON.parse(
+        mockFileRepo.getFileContent('packages/app/package.json')!,
+      );
+      expect(appPkg.dependencies['@myorg/core']).toBe('^1.0.0');
+
+      await updater.finalize(true);
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
+    it('finalize runs single root install with detected package manager', async () => {
+      setRootPackageJson(mockFileRepo, {
+        name: 'root',
+        private: true,
+        workspaces: { packages: ['packages/*'] },
+        packageManager: 'yarn@4.0.2',
+      });
+      setMember(mockFileRepo, 'packages/core', {
+        name: '@myorg/core',
+        version: '1.0.0',
+      });
+      setMember(mockFileRepo, 'packages/app', {
+        name: '@myorg/app',
+        version: '1.0.0',
+        dependencies: { '@myorg/core': '^1.0.0' },
+      });
+
+      mockSpawn.mockImplementation(makeSuccessSpawn() as any);
+
+      const result = await updater.updateVersion(
+        'packages/core',
+        '1.1.0',
+        false,
+      );
+      expect(result.success).toBe(true);
+      expect(mockSpawn).not.toHaveBeenCalled();
+
+      await updater.finalize(false);
+
+      expect(mockSpawn).toHaveBeenCalledTimes(1);
+      const callArgs = mockSpawn.mock.calls[0];
+      expect(callArgs[0]).toBe('yarn');
+      expect(callArgs[1]).toEqual(['install']);
+      expect((callArgs[2] as any).cwd).toBe('.');
+
+      // Subsequent finalize call should be a no-op
+      mockSpawn.mockClear();
+      await updater.finalize(false);
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
+    it('falls back to npm when packageManager is missing', async () => {
+      setRootPackageJson(mockFileRepo, {
+        name: 'root',
+        private: true,
+        workspaces: ['packages/*'],
+      });
+      setMember(mockFileRepo, 'packages/core', {
+        name: '@myorg/core',
+        version: '1.0.0',
+      });
+
+      mockSpawn.mockImplementation(makeSuccessSpawn() as any);
+
+      await updater.updateVersion('packages/core', '1.1.0', false);
+      await updater.finalize(false);
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'npm',
+        ['install'],
+        expect.objectContaining({ cwd: '.' }),
+      );
+    });
+
+    it('detects pnpm workspace via packageManager', async () => {
+      setRootPackageJson(mockFileRepo, {
+        name: 'root',
+        private: true,
+        workspaces: ['packages/*'],
+        packageManager: 'pnpm@9.1.0',
+      });
+      setMember(mockFileRepo, 'packages/core', {
+        name: '@myorg/core',
+        version: '1.0.0',
+      });
+
+      mockSpawn.mockImplementation(makeSuccessSpawn() as any);
+
+      await updater.updateVersion('packages/core', '1.1.0', false);
+      await updater.finalize(false);
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'pnpm',
+        ['install'],
+        expect.anything(),
+      );
+    });
   });
 });
