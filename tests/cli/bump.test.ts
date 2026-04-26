@@ -121,7 +121,10 @@ version = "2.0.0"
   });
 
   it('should error when not in a package directory', async () => {
-    process.chdir(testDir);
+    // A subdirectory that isn't referenced by any [[package]] entry and isn't
+    // a parent of one should produce an error.
+    await mkdir(join(testDir, 'unrelated'), { recursive: true });
+    process.chdir(join(testDir, 'unrelated'));
 
     expect(() => {
       execSync(`node ${join(originalCwd, 'dist/cli.js')} bump patch --yes`, {
@@ -146,6 +149,33 @@ version = "2.0.0"
     const tomlContent = await readFile(join(testDir, 'versions.toml'), 'utf-8');
     expect(tomlContent).toContain('version = "1.0.1"'); // service-a
     expect(tomlContent).toContain('version = "2.0.1"'); // service-b
+  });
+
+  it('should batch bump all packages when run from config root', async () => {
+    // Run from the directory that contains versions.toml. All packages declared
+    // in versions.toml should be bumped, regardless of their `path`.
+    process.chdir(testDir);
+
+    const output = execSync(
+      `node ${join(originalCwd, 'dist/cli.js')} bump minor --yes`,
+      { encoding: 'utf-8' },
+    );
+
+    expect(output).toContain('service-a');
+    expect(output).toContain('service-b');
+
+    const tomlContent = await readFile(join(testDir, 'versions.toml'), 'utf-8');
+    expect(tomlContent).toContain('version = "1.1.0"'); // service-a
+    expect(tomlContent).toContain('version = "2.1.0"'); // service-b
+
+    const pkgA = JSON.parse(
+      await readFile(join(testDir, 'packages/service-a/package.json'), 'utf-8'),
+    );
+    const pkgB = JSON.parse(
+      await readFile(join(testDir, 'packages/service-b/package.json'), 'utf-8'),
+    );
+    expect(pkgA.version).toBe('1.1.0');
+    expect(pkgB.version).toBe('2.1.0');
   });
 
   it('should preserve other fields in versions.toml', async () => {

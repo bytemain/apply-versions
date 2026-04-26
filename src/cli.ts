@@ -384,15 +384,17 @@ async function handleBump(
     const parser = new ConfigParser();
     const packages = await parser.parse(configPath);
 
-    // Find packages for current directory
-    const targetPackages = packages.filter((pkg) => {
-      const pkgPath = pkg.path === '.' ? '' : pkg.path;
-      return (
-        pkgPath === relativeToConfig ||
-        relativeToConfig.startsWith(pkgPath + '/') ||
-        pkgPath.startsWith(relativeToConfig + '/')
-      );
-    });
+    // Find packages for current directory.
+    // When running from the config directory itself (relativeToConfig is '' or
+    // starts with '..'), `autoFilterPackages` returns all packages so that a
+    // batch bump (e.g. `apply-versions bump minor`) updates every package
+    // declared in versions.toml. Otherwise it scopes to packages under the
+    // current directory.
+    const targetPackages = autoFilterPackages(
+      packages,
+      configDir,
+      options.verbose,
+    );
 
     if (targetPackages.length === 0) {
       console.error(
